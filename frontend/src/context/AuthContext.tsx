@@ -7,18 +7,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
+    let active = true
     async function restoreSession() {
       try {
         const session = await refreshSession()
         const profile = await currentUser(session.accessToken)
-        setUser(profile.user)
+        if (active) setUser(profile.user)
       } catch {
-        setUser(null)
+        if (active) setUser(null)
       } finally {
-        setIsLoading(false)
+        if (active) setIsLoading(false)
       }
     }
     void restoreSession()
+    return () => { active = false }
   }, [])
 
   const value = useMemo<AuthContextValue>(() => ({
@@ -29,11 +31,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session.user)
     },
     logout: async () => {
-      try {
-        await logoutRequest()
-      } finally {
-        setUser(null)
-      }
+      await logoutRequest()
+      setUser(null)
     },
   }), [isLoading, user])
 

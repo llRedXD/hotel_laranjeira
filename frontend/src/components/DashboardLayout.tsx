@@ -1,4 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
 import { useAuth } from '../hooks/useAuth'
 
 const menuItems = [
@@ -12,15 +13,21 @@ const menuItems = [
 export function DashboardLayout() {
   const { logout, user } = useAuth()
   const navigate = useNavigate()
+  const [logoutError, setLogoutError] = useState('')
 
   async function handleLogout() {
-    await logout()
-    navigate('/login', { replace: true })
+    try {
+      await logout()
+      navigate('/login', { replace: true })
+    } catch {
+      setLogoutError('Não foi possível encerrar a sessão. Tente novamente.')
+    }
   }
 
   return (
     <div className="min-h-screen bg-sand lg:flex">
       <aside className="bg-forest px-5 py-5 text-cream lg:flex lg:w-72 lg:flex-col lg:px-6 lg:py-8">
+        {logoutError && <p role="alert">{logoutError}</p>}
         <div className="flex items-center justify-between lg:block">
           <div className="flex items-center gap-3">
             <span className="grid size-10 place-items-center rounded-full bg-orange text-lg font-bold text-white">L</span>
