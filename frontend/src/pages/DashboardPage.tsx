@@ -1,4 +1,5 @@
 import { useAuth } from '../hooks/useAuth'
+import { Link } from 'react-router-dom'
 
 const metrics = [
   { label: 'Reservas ativas', value: '24', detail: '5 novas desde ontem', accent: 'bg-orange/15 text-orange' },
@@ -15,9 +16,9 @@ const movement = [
 ]
 
 const shortcuts = [
-  { title: 'Nova reserva', description: 'Registre a próxima estadia.' },
-  { title: 'Cadastrar hóspede', description: 'Adicione um novo visitante.' },
-  { title: 'Consultar quartos', description: 'Veja disponibilidade e status.' },
+  { title: 'Hóspedes', description: 'Cadastre e consulte visitantes.', to: '/hospedes' },
+  { title: 'Quartos', description: 'Veja disponibilidade e diárias.', to: '/quartos' },
+  { title: 'Categorias', description: 'Organize os tipos de acomodação.', to: '/categorias' },
 ]
 
 export function DashboardPage() {
@@ -29,9 +30,9 @@ export function DashboardPage() {
         <div>
           <p className="text-sm font-semibold tracking-[0.18em] text-orange uppercase">Visão geral</p>
           <h1 className="mt-2 font-serif text-3xl font-semibold text-forest sm:text-4xl">Olá, {user?.name}.</h1>
-          <p className="mt-2 text-ink/65">Acompanhe o movimento do Hotel Laranjeira nesta terça-feira.</p>
+          <p className="mt-2 text-ink/65">Acesse os cadastros do Hotel Laranjeira. Os indicadores abaixo são demonstrativos.</p>
         </div>
-        <p className="rounded-full bg-cream px-4 py-2 text-sm font-medium text-ink/65 shadow-sm">14 de setembro de 2026</p>
+        <p className="rounded-full bg-cream px-4 py-2 text-sm font-medium text-ink/65 shadow-sm">{new Date().toLocaleDateString('pt-BR', { dateStyle: 'long' })}</p>
       </header>
 
       <section className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Resumo operacional">
@@ -73,13 +74,13 @@ export function DashboardPage() {
           <h2 className="mt-2 font-serif text-2xl font-semibold">Próximos passos</h2>
           <div className="mt-6 space-y-3">
             {shortcuts.map((shortcut) => (
-              <button key={shortcut.title} className="w-full rounded-xl border border-cream/15 p-4 text-left transition hover:bg-cream/10" type="button" disabled>
+              <Link key={shortcut.title} to={shortcut.to} className="block w-full rounded-xl border border-cream/15 p-4 text-left transition hover:bg-cream/10">
                 <span className="block font-semibold">{shortcut.title}</span>
                 <span className="mt-1 block text-sm text-cream/65">{shortcut.description}</span>
-              </button>
+              </Link>
             ))}
           </div>
-          <p className="mt-5 text-xs text-cream/55">Os atalhos serão ativados conforme os módulos forem desenvolvidos.</p>
+          <p className="mt-5 text-xs text-cream/55">Reservas e pagamentos estarão disponíveis em uma próxima etapa.</p>
         </section>
       </div>
     </div>

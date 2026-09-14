@@ -7,6 +7,7 @@ import { DashboardPage } from './pages/DashboardPage'
 import { LoginPage } from './pages/LoginPage'
 import { PasswordRecoveryPage } from './pages/PasswordRecoveryPage'
 import { PasswordResetPage } from './pages/PasswordResetPage'
+import { RecordsPage } from './pages/RecordsPage'
 
 export default function App() {
   return (
@@ -23,6 +24,9 @@ export default function App() {
       <Route element={<ProtectedRoute />}>
         <Route element={<DashboardLayout />}>
           <Route path="/painel" element={<DashboardPage />} />
+          <Route path="/hospedes" element={<RecordsPage key="guests" resource="guests" />} />
+          <Route path="/categorias" element={<RecordsPage key="categories" resource="categories" />} />
+          <Route path="/quartos" element={<RecordsPage key="rooms" resource="rooms" />} />
         </Route>
       </Route>
     </Routes>

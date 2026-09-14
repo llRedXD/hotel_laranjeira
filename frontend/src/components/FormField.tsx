@@ -5,7 +5,8 @@ type FormFieldProps = InputHTMLAttributes<HTMLInputElement> & {
   label: string
 }
 
-export function FormField({ error, id, label, ...inputProps }: FormFieldProps) {
+export function FormField({ error, id: explicitId, label, ...inputProps }: FormFieldProps) {
+  const id = explicitId ?? inputProps.name
   return (
     <div>
       <label className="mb-1.5 block text-sm font-medium text-ink" htmlFor={id}>{label}</label>
