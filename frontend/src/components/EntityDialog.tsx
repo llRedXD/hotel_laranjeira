@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { APIError } from '../services/api'
 import { saveEntity, type Entity, type Resource } from '../services/hotel'
 import { FormField } from './FormField'
@@ -18,6 +18,23 @@ const fields: Record<Resource, FieldSpec[]> = {
 }
 const names: Record<Resource, string> = { guests: 'hóspede', categories: 'categoria', rooms: 'quarto' }
 const selectClass = 'w-full rounded-xl border border-forest/20 bg-white px-4 py-3 text-ink'
+
+function formatDocument(value: string) {
+  const clean = value.replace(/[^\dA-Za-z]/g, '').toUpperCase().slice(0, 30)
+  if (!/^\d+$/.test(clean) || clean.length > 11) return clean
+  if (clean.length <= 3) return clean
+  if (clean.length <= 6) return `${clean.slice(0, 3)}.${clean.slice(3)}`
+  if (clean.length <= 9) return `${clean.slice(0, 3)}.${clean.slice(3, 6)}.${clean.slice(6)}`
+  return `${clean.slice(0, 3)}.${clean.slice(3, 6)}.${clean.slice(6, 9)}-${clean.slice(9)}`
+}
+
+function formatPhone(value: string) {
+  const digits = value.replace(/\D/g, '').slice(0, 11)
+  if (digits.length <= 2) return digits.length ? `(${digits}` : ''
+  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`
+  const split = digits.length > 10 ? 7 : 6
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, split)}-${digits.slice(split)}`
+}
 export function EntityDialog({ resource, entity, readOnly, categories, onClose, onSaved }: {
   resource: Resource, entity?: Entity, readOnly: boolean, categories: Entity[], onClose: () => void, onSaved: () => void
 }) {
@@ -30,6 +47,16 @@ export function EntityDialog({ resource, entity, readOnly, categories, onClose, 
     event.preventDefault()
     if (busy) return
     const values = Object.fromEntries(new FormData(event.currentTarget).entries()) as Record<string, string>
+    if (resource === 'guests') {
+      values.document = values.document?.replace(/[^\dA-Za-z]/g, '').toUpperCase() || ''
+      values.phone = values.phone?.replace(/\D/g, '') || ''
+      if (values.phone && !/^\d{10,11}$/.test(values.phone)) {
+        setErrors({ phone: 'Informe um telefone com DDD (10 ou 11 dígitos).' }); setMessage('Revise os campos destacados.'); return
+      }
+      if (values.email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(values.email.trim())) {
+        setErrors({ email: 'Informe um e-mail válido.' }); setMessage('Revise os campos destacados.'); return
+      }
+    }
     setBusy(true); setErrors({}); setMessage('')
     try { await saveEntity(resource, entity?.id, values); onSaved() }
     catch (error) {
@@ -39,7 +66,11 @@ export function EntityDialog({ resource, entity, readOnly, categories, onClose, 
   }
   function value(key: string): string {
     const raw = entity?.[key as keyof Entity]
-    return raw == null ? '' : String(raw)
+    if (raw == null) return ''
+    const text = String(raw)
+    if (resource === 'guests' && key === 'document') return formatDocument(text)
+    if (resource === 'guests' && key === 'phone') return formatPhone(text)
+    return text
   }
   return (
     <dialog ref={dialog} onCancel={event => { event.preventDefault(); if (!busy) onClose() }}
@@ -62,6 +93,12 @@ export function EntityDialog({ resource, entity, readOnly, categories, onClose, 
         <fieldset disabled={busy} className="space-y-4">
           {fields[resource].map(field => <FormField key={field.key} id={field.key} name={field.key} label={field.label + (field.required ? ' *' : '')}
             type={field.type ?? 'text'} defaultValue={value(field.key)} required={field.required} maxLength={field.max}
+            autoComplete={resource === 'guests' ? ({ name: 'name', email: 'email', phone: 'tel', address: 'street-address' }[field.key] ?? 'off') : 'off'}
+            inputMode={resource === 'guests' && (field.key === 'document' || field.key === 'phone') ? 'tel' : undefined}
+            pattern={resource === 'guests' && field.key === 'email' ? '^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$' : undefined}
+            onChange={resource === 'guests' && (field.key === 'document' || field.key === 'phone') ? (event: ChangeEvent<HTMLInputElement>) => {
+              event.currentTarget.value = field.key === 'document' ? formatDocument(event.currentTarget.value) : formatPhone(event.currentTarget.value)
+            } : undefined}
             min={field.key === 'capacity' ? 1 : field.key === 'dailyRate' ? 0 : undefined}
             max={field.key === 'capacity' ? 2147483647 : field.key === 'dailyRate' ? '9999999999.99' : undefined}
             step={field.key === 'dailyRate' ? '0.01' : field.key === 'capacity' ? '1' : undefined} error={errors[field.key]} />)}
