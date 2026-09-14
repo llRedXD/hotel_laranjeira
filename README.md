@@ -60,6 +60,9 @@ Os usuários iniciais de administrador e recepção são configurados por
 em desenvolvimento. Ao rodar a API fora do Docker, exporte essas variáveis
 antes de executar `CGO_ENABLED=0 go run ./cmd/api`.
 
+Para acessar o sistema na avaliação, consulte os
+[usuários de teste e instruções de acesso](docs/USUARIOS_TESTE.md).
+
 ## Estado atual
 
 - Autenticação e painel React; métricas do painel são demonstrativas.

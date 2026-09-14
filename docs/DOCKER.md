@@ -49,6 +49,9 @@ Somente APP_ENV=development ou dev permite bootstrap. Credenciais de exemplo:
 admin@hotel.com / admin12345678 e recepcao@hotel.com / recepcao123456.
 Contas existentes não são sobrescritas; valores do .env prevalecem.
 
+Consulte também a página de [usuários de teste](USUARIOS_TESTE.md), com os
+perfis, as credenciais padrão e as instruções de acesso para avaliação.
+
 FRONTEND_PORT, BACKEND_PORT e POSTGRES_PORT alteram portas publicadas.
 Se FRONTEND_ORIGIN estiver no .env, ajuste-o para a porta de FRONTEND_PORT.
 Credenciais de um volume PostgreSQL existente não mudam ao editar o .env.
