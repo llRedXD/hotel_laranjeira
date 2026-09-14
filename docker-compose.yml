@@ -1,4 +1,42 @@
 services:
+  database:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-hotel_laranjeira}
+      POSTGRES_USER: ${POSTGRES_USER:-hotel_laranjeira}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hotel_laranjeira_dev}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      PORT: 8080
+      DATABASE_URL: postgres://${POSTGRES_USER:-hotel_laranjeira}:${POSTGRES_PASSWORD:-hotel_laranjeira_dev}@database:5432/${POSTGRES_DB:-hotel_laranjeira}?sslmode=disable
+      APP_ENV: ${APP_ENV:-development}
+      JWT_SECRET: ${JWT_SECRET:-hotel-laranjeira-development-secret-change-me}
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:5173}
+      INITIAL_ADMIN_NAME: ${INITIAL_ADMIN_NAME:-Administrador}
+      INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL:-admin@hotel.com}
+      INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:-admin12345678}
+      INITIAL_RECEPTION_NAME: ${INITIAL_RECEPTION_NAME:-Recepção}
+      INITIAL_RECEPTION_EMAIL: ${INITIAL_RECEPTION_EMAIL:-recepcao@hotel.com}
+      INITIAL_RECEPTION_PASSWORD: ${INITIAL_RECEPTION_PASSWORD:-recepcao123456}
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    depends_on:
+      database:
+        condition: service_healthy
+
   frontend:
     build:
       context: ./frontend
@@ -7,3 +45,6 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
+
+volumes:
+  postgres_data:
