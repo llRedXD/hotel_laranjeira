@@ -1,0 +1,23 @@
+# Dependências
+node_modules/
+frontend/node_modules/
+
+# Variáveis de ambiente e dados locais
+.env
+.env.*
+!.env.example
+*.sqlite
+*.sqlite3
+
+# Arquivos gerados
+dist/
+frontend/dist/
+coverage/
+*.log
+
+# Editores e sistema operacional
+.DS_Store
+.vscode/
+.idea/
+
+Agent.md
