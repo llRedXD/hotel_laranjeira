@@ -6,15 +6,28 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-hotel_laranjeira}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hotel_laranjeira_dev}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database/migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 5s
       retries: 10
+
+  migrate:
+    image: postgres:17-alpine
+    environment:
+      PGHOST: database
+      PGDATABASE: ${POSTGRES_DB:-hotel_laranjeira}
+      PGUSER: ${POSTGRES_USER:-hotel_laranjeira}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-hotel_laranjeira_dev}
+    volumes:
+      - ./database:/database:ro
+    entrypoint: ["psql", "-X", "-v", "ON_ERROR_STOP=1", "-f", "/database/migrate.sql"]
+    depends_on:
+      database:
+        condition: service_healthy
 
   backend:
     build:
@@ -24,7 +37,7 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-hotel_laranjeira}:${POSTGRES_PASSWORD:-hotel_laranjeira_dev}@database:5432/${POSTGRES_DB:-hotel_laranjeira}?sslmode=disable
       APP_ENV: ${APP_ENV:-development}
       JWT_SECRET: ${JWT_SECRET:-hotel-laranjeira-development-secret-change-me}
-      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:5173}
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:${FRONTEND_PORT:-5173}}
       INITIAL_ADMIN_NAME: ${INITIAL_ADMIN_NAME:-Administrador}
       INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL:-admin@hotel.com}
       INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:-admin12345678}
@@ -32,19 +45,39 @@ services:
       INITIAL_RECEPTION_EMAIL: ${INITIAL_RECEPTION_EMAIL:-recepcao@hotel.com}
       INITIAL_RECEPTION_PASSWORD: ${INITIAL_RECEPTION_PASSWORD:-recepcao123456}
     ports:
-      - "${BACKEND_PORT:-8080}:8080"
+      - "127.0.0.1:${BACKEND_PORT:-8080}:8080"
     depends_on:
       database:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   frontend:
     build:
       context: ./frontend
     ports:
-      - "${FRONTEND_PORT:-5173}:5173"
+      - "127.0.0.1:${FRONTEND_PORT:-5173}:5173"
+    environment:
+      VITE_API_URL: /api/v1
+      API_PROXY_TARGET: http://backend:8080
+    depends_on:
+      backend:
+        condition: service_healthy
     volumes:
       - ./frontend:/app
       - /app/node_modules
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:5173/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
 volumes:
   postgres_data:
