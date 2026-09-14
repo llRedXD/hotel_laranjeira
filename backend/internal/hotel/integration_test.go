@@ -97,4 +97,31 @@ func TestPostgresPartialUpdates(t *testing.T) {
 	if err != nil || found.Name != next || found.Phone == nil {
 		t.Fatalf("persistência: %+v %v", found, err)
 	}
+	number, rate, capacity := "T-101", "199.90", 2
+	room, err := service.SaveRoom(ctx, "", RoomPatch{Number: &number, CategoryID: &category.ID, Capacity: &capacity, DailyRate: &rate})
+	if err != nil || room.DailyRate != "199.90" || !room.IsAvailable {
+		t.Fatalf("cadastro quarto: %+v %v", room, err)
+	}
+	available := false
+	room, err = service.SaveRoom(ctx, room.ID, RoomPatch{IsAvailable: &available})
+	if err != nil || room.IsAvailable || room.Capacity != 2 || room.Number != number {
+		t.Fatalf("disponibilidade: %+v %v", room, err)
+	}
+	filtered, err := service.ListRooms(ctx, RoomFilter{CategoryID: category.ID, Available: &available, Limit: 20})
+	if err != nil || len(filtered) != 1 {
+		t.Fatalf("filtro: %+v %v", filtered, err)
+	}
+	invalidRate := "1.999"
+	if _, err = service.SaveRoom(ctx, room.ID, RoomPatch{DailyRate: &invalidRate}); !errors.As(err, &validation) {
+		t.Fatalf("precisão: %v", err)
+	}
+	if _, err = tx.Exec(ctx, "SAVEPOINT room_conflict"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = service.SaveRoom(ctx, "", RoomPatch{Number: &number, CategoryID: &category.ID, Capacity: &capacity, DailyRate: &rate}); !errors.Is(err, ErrConflict) {
+		t.Fatalf("número duplicado: %v", err)
+	}
+	if _, err = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT room_conflict"); err != nil {
+		t.Fatal(err)
+	}
 }

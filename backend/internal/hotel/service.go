@@ -20,6 +20,9 @@ type ValidationError struct{ Fields map[string]string }
 func (e *ValidationError) Error() string { return "dados inválidos" }
 
 type Repository interface {
+	SaveRoom(context.Context, string, RoomPatch) (Room, error)
+	GetRoom(context.Context, string) (Room, error)
+	ListRooms(context.Context, RoomFilter) ([]Room, error)
 	CreateGuest(context.Context, GuestInput) (Guest, error)
 	UpdateGuest(context.Context, string, GuestPatch) (Guest, error)
 	GetGuest(context.Context, string) (Guest, error)

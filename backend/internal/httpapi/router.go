@@ -44,6 +44,11 @@ func NewRouter(db *pgxpool.Pool, cfg config.Config) http.Handler {
 	mux.HandleFunc("POST /api/v1/room-categories", api.createCategory)
 	mux.HandleFunc("GET /api/v1/room-categories", api.listCategories)
 	mux.HandleFunc("PATCH /api/v1/room-categories/{id}", api.updateCategory)
+	mux.HandleFunc("GET /api/v1/rooms", api.listRooms)
+	mux.HandleFunc("GET /api/v1/rooms/{id}", api.getRoom)
+	mux.HandleFunc("POST /api/v1/rooms", api.saveRoom)
+	mux.HandleFunc("PATCH /api/v1/rooms/{id}", api.saveRoom)
+	mux.HandleFunc("PATCH /api/v1/rooms/{id}/availability", api.roomAvailability)
 	return cors(security(mux), cfg.FrontendOrigin)
 }
 
