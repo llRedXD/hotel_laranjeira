@@ -17,8 +17,8 @@ import (
 
 func main() {
 	cfg := config.Load()
-	if !cfg.IsDevelopment() && cfg.JWTSecret == "hotel-laranjeira-development-secret-change-me" {
-		log.Fatal("JWT_SECRET deve ser configurado fora do ambiente de desenvolvimento")
+	if err := cfg.Validate(); err != nil {
+		log.Fatal(err)
 	}
 	ctx := context.Background()
 
@@ -27,7 +27,7 @@ func main() {
 		log.Fatalf("não foi possível conectar ao banco de dados: %v", err)
 	}
 	defer db.Close()
-	if err := auth.BootstrapUsers(ctx, db, cfg); err != nil {
+	if err := auth.BootstrapUsers(ctx, auth.NewPostgresRepository(db), cfg); err != nil {
 		log.Fatalf("não foi possível configurar os usuários iniciais: %v", err)
 	}
 
@@ -35,6 +35,10 @@ func main() {
 		Addr:              ":" + cfg.Port,
 		Handler:           httpapi.NewRouter(db, cfg),
 		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      20 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		MaxHeaderBytes:    16 << 10,
 	}
 
 	go func() {

@@ -5,12 +5,16 @@ import (
 	"errors"
 	"io"
 	"log"
+	"mime"
 	"net/http"
+	"net/mail"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/hotel-laranjeira/backend/internal/auth"
 	"github.com/hotel-laranjeira/backend/internal/config"
+	"github.com/hotel-laranjeira/backend/internal/hotel"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -18,12 +22,13 @@ const refreshCookieName = "hotel_laranjeira_refresh"
 
 type api struct {
 	auth           *auth.Service
+	hotel          *hotel.Service
 	frontendOrigin string
 	isDevelopment  bool
 }
 
 func NewRouter(db *pgxpool.Pool, cfg config.Config) http.Handler {
-	api := &api{auth: auth.NewService(db, cfg.JWTSecret), frontendOrigin: cfg.FrontendOrigin, isDevelopment: cfg.IsDevelopment()}
+	api := &api{auth: auth.NewService(auth.NewPostgresRepository(db), cfg.JWTSecret), hotel: hotel.NewService(hotel.NewPostgresRepository(db)), frontendOrigin: cfg.FrontendOrigin, isDevelopment: cfg.IsDevelopment()}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/health", healthHandler(db))
 	mux.HandleFunc("POST /api/v1/auth/login", api.login)
@@ -32,7 +37,64 @@ func NewRouter(db *pgxpool.Pool, cfg config.Config) http.Handler {
 	mux.HandleFunc("GET /api/v1/auth/me", api.me)
 	mux.HandleFunc("POST /api/v1/auth/password-recovery", api.passwordRecovery)
 	mux.HandleFunc("POST /api/v1/auth/password-reset", api.passwordReset)
-	return cors(mux, cfg.FrontendOrigin)
+	mux.HandleFunc("POST /api/v1/guests", api.createGuest)
+	mux.HandleFunc("GET /api/v1/guests", api.listGuests)
+	mux.HandleFunc("GET /api/v1/guests/{id}", api.getGuest)
+	mux.HandleFunc("PATCH /api/v1/guests/{id}", api.updateGuest)
+	mux.HandleFunc("POST /api/v1/room-categories", api.createCategory)
+	mux.HandleFunc("GET /api/v1/room-categories", api.listCategories)
+	mux.HandleFunc("PATCH /api/v1/room-categories/{id}", api.updateCategory)
+	return cors(security(mux), cfg.FrontendOrigin)
+}
+
+func (a *api) requireAuth(w http.ResponseWriter, r *http.Request) bool {
+	if _, err := a.auth.UserFromAccessToken(r.Context(), bearerToken(r)); err != nil {
+		if !errors.Is(err, auth.ErrUnauthorized) {
+			internalError(w, err)
+			return false
+		}
+		writeError(w, http.StatusUnauthorized, "unauthorized", "Token de acesso inválido ou expirado.", nil)
+		return false
+	}
+	return true
+}
+
+func isUUID(value string) bool {
+	if len(value) != 36 {
+		return false
+	}
+	for index, char := range value {
+		if index == 8 || index == 13 || index == 18 || index == 23 {
+			if char != '-' {
+				return false
+			}
+			continue
+		}
+		if !(char >= '0' && char <= '9') && !(char >= 'a' && char <= 'f') && !(char >= 'A' && char <= 'F') {
+			return false
+		}
+	}
+	return true
+}
+
+func pagination(w http.ResponseWriter, r *http.Request) (int, int, bool) {
+	limit, offset := 50, 0
+	var err error
+	if raw := r.URL.Query().Get("limit"); raw != "" {
+		limit, err = strconv.Atoi(raw)
+		if err != nil || limit < 1 || limit > 100 {
+			writeValidationError(w, map[string]string{"limit": "Use um inteiro entre 1 e 100."})
+			return 0, 0, false
+		}
+	}
+	if raw := r.URL.Query().Get("offset"); raw != "" {
+		offset, err = strconv.Atoi(raw)
+		if err != nil || offset < 0 || offset > 100000 {
+			writeValidationError(w, map[string]string{"offset": "Use um inteiro entre 0 e 100000."})
+			return 0, 0, false
+		}
+	}
+	return limit, offset, true
 }
 
 func healthHandler(db *pgxpool.Pool) http.HandlerFunc {
@@ -97,15 +159,21 @@ func (a *api) logout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *api) me(w http.ResponseWriter, r *http.Request) {
-	user, err := a.auth.UserFromAccessToken(bearerToken(r))
+	user, err := a.auth.UserFromAccessToken(r.Context(), bearerToken(r))
 	if err != nil {
+		if !errors.Is(err, auth.ErrUnauthorized) {
+			internalError(w, err)
+			return
+		}
 		writeError(w, http.StatusUnauthorized, "unauthorized", "Token de acesso inválido ou expirado.", nil)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"user": user})
 }
 
-type recoveryRequest struct{ Email string `json:"email"` }
+type recoveryRequest struct {
+	Email string `json:"email"`
+}
 
 func (a *api) passwordRecovery(w http.ResponseWriter, r *http.Request) {
 	var input recoveryRequest
@@ -172,11 +240,18 @@ func validateCredentials(input loginRequest) map[string]string {
 	if input.Password == "" {
 		fields["password"] = "Informe sua senha."
 	}
+	if len(input.Password) > 72 {
+		fields["password"] = "Senha excede 72 bytes."
+	}
 	return fields
 }
 
 func isValidEmail(email string) bool {
 	email = strings.TrimSpace(email)
+	address, err := mail.ParseAddress(email)
+	if err != nil || address.Address != email {
+		return false
+	}
 	if len(email) < 3 || len(email) > 255 || strings.Count(email, "@") != 1 {
 		return false
 	}
@@ -210,6 +285,18 @@ func bearerToken(r *http.Request) string {
 
 func cors(next http.Handler, frontendOrigin string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Referrer-Policy", "no-referrer")
+		w.Header().Add("Vary", "Origin")
+		if origin := r.Header.Get("Origin"); origin != "" && origin != frontendOrigin {
+			writeError(w, http.StatusForbidden, "origin_forbidden", "Origem não permitida.", nil)
+			return
+		}
+		if r.Header.Get("Sec-Fetch-Site") == "cross-site" {
+			writeError(w, http.StatusForbidden, "origin_forbidden", "Origem não permitida.", nil)
+			return
+		}
 		w.Header().Set("Access-Control-Allow-Origin", frontendOrigin)
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
@@ -223,7 +310,12 @@ func cors(next http.Handler, frontendOrigin string) http.Handler {
 }
 
 func decodeJSON(w http.ResponseWriter, r *http.Request, destination any) bool {
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	if err != nil || mediaType != "application/json" {
+		writeError(w, http.StatusUnsupportedMediaType, "unsupported_media_type", "Use Content-Type: application/json.", nil)
+		return false
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(destination); err != nil {
