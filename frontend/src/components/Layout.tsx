@@ -13,7 +13,6 @@ export function Layout() {
             <span className="font-serif text-xl font-semibold tracking-tight">Hotel Laranjeira</span>
           </NavLink>
           <div className="flex items-center gap-4 text-sm font-medium sm:gap-6">
-            <NavLink to="/" className={linkClassName}>Início</NavLink>
             <NavLink to="/login" className={linkClassName}>Entrar</NavLink>
           </div>
         </nav>

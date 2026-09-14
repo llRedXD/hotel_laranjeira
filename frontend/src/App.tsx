@@ -4,7 +4,6 @@ import { Layout } from './components/Layout'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { PublicOnlyRoute } from './components/PublicOnlyRoute'
 import { DashboardPage } from './pages/DashboardPage'
-import { HomePage } from './pages/HomePage'
 import { LoginPage } from './pages/LoginPage'
 import { PasswordRecoveryPage } from './pages/PasswordRecoveryPage'
 import { PasswordResetPage } from './pages/PasswordResetPage'
@@ -13,8 +12,8 @@ export default function App() {
   return (
     <Routes>
       <Route element={<Layout />}>
-        <Route path="/" element={<HomePage />} />
         <Route element={<PublicOnlyRoute />}>
+          <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/recuperar-senha" element={<PasswordRecoveryPage />} />
           <Route path="/redefinir-senha" element={<PasswordResetPage />} />
