@@ -15,7 +15,6 @@ export function Layout() {
           <div className="flex items-center gap-4 text-sm font-medium sm:gap-6">
             <NavLink to="/" className={linkClassName}>Início</NavLink>
             <NavLink to="/login" className={linkClassName}>Entrar</NavLink>
-            <NavLink to="/cadastro" className="rounded-full bg-forest px-4 py-2 text-cream transition-colors hover:bg-moss">Criar acesso</NavLink>
           </div>
         </nav>
       </header>

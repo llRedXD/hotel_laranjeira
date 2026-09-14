@@ -15,10 +15,9 @@ export function HomePage() {
         <div className="relative mx-auto max-w-6xl">
           <p className="mb-5 text-sm font-semibold tracking-[0.22em] text-peach uppercase">Gestão hoteleira</p>
           <h1 className="max-w-3xl font-serif text-5xl leading-[1.05] font-semibold sm:text-7xl">O cuidado do seu hotel, em um só lugar.</h1>
-          <p className="mt-6 max-w-xl text-lg leading-8 text-cream/80">Uma plataforma pensada para tornar a rotina da recepção mais leve, organizada e humana.</p>
+          <p className="mt-6 max-w-xl text-lg leading-8 text-cream/80">Uma plataforma pensada para tornar a rotina da equipe mais leve, organizada e humana.</p>
           <div className="mt-9 flex flex-wrap gap-4">
             <Link to="/login" className="rounded-full bg-orange px-6 py-3 font-semibold text-white transition hover:bg-orange/85">Acessar sistema</Link>
-            <Link to="/cadastro" className="rounded-full border border-cream/40 px-6 py-3 font-semibold text-cream transition hover:bg-cream/10">Criar acesso</Link>
           </div>
         </div>
       </section>
