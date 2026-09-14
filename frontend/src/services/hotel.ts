@@ -43,9 +43,12 @@ export async function changeAvailability(id: string, available: boolean) {
   await authenticatedRequest(`/rooms/${id}/availability`, { method: 'PATCH', body: JSON.stringify({ isAvailable: available }) })
 }
 export async function allCategories(): Promise<Entity[]> {
+  return listAll('categories')
+}
+export async function listAll(resource: Resource): Promise<Entity[]> {
   const result: Entity[] = []
   for (let offset = 0; offset <= 100000; offset += 100) {
-    const page = await listEntities('categories', new URLSearchParams({ limit: '100', offset: String(offset) }))
+    const page = await listEntities(resource, new URLSearchParams({ limit: '100', offset: String(offset) }))
     result.push(...page)
     if (page.length < 100) break
   }
