@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #243128;
+  --color-forest: #31513b;
+  --color-moss: #668258;
+  --color-sand: #f7f2e9;
+  --color-cream: #fffdf8;
+  --color-orange: #df7c37;
+  --color-peach: #f4c58b;
+}
+
+@layer base {
+  body {
+    @apply min-h-screen bg-sand font-sans text-ink antialiased;
+  }
+
+  button, input {
+    font: inherit;
+  }
+}
