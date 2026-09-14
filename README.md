@@ -16,14 +16,15 @@ hotel_laranjeira/
 ## Front-end
 
 O front-end utiliza React, TypeScript, Vite e Tailwind CSS. Ele contém as
-páginas públicas inicial, de login e de recuperação de senha. O acesso à área
+páginas de login, recuperação e redefinição de senha. A rota inicial direciona
+ao login ou ao painel, conforme a sessão. O acesso à área
 interna é destinado à equipe autorizada; contas não são criadas publicamente.
 
 ### Executar localmente
 
 ```bash
 cd frontend
-npm install
+npm ci
 npm run dev
 ```
 
@@ -40,11 +41,14 @@ O serviço fica disponível em `http://localhost:5173` (ou na porta definida em
 
 ## Back-end e banco de dados
 
+Guia completo de inicialização, volumes existentes e diagnóstico:
+[Ambiente Docker](docs/DOCKER.md).
+
 Copie `.env.example` para `.env` caso queira alterar as portas ou credenciais
 de desenvolvimento. Para iniciar a API e o PostgreSQL:
 
 ```bash
-docker-compose up --build
+docker compose up --build
 ```
 
 - Front-end: `http://localhost:5173`
@@ -56,7 +60,48 @@ Os usuários iniciais de administrador e recepção são configurados por
 em desenvolvimento. Ao rodar a API fora do Docker, exporte essas variáveis
 antes de executar `CGO_ENABLED=0 go run ./cmd/api`.
 
+## Estado atual
+
+- Autenticação e painel React; métricas do painel são demonstrativas.
+- API de hóspedes e categorias com cadastro, consulta e edição.
+- Tabela de quartos existe; endpoints e telas operacionais ainda estão pendentes.
+- Reservas, pagamentos e check-in/out ainda não foram implementados.
+
+## API sem Docker
+
+Requer Go 1.24 ou superior e PostgreSQL com as migrações aplicadas.
+A API não carrega arquivos .env automaticamente. Na raiz, em bash/zsh:
+
+```bash
+set -a
+source .env
+set +a
+cd backend
+CGO_ENABLED=0 go run ./cmd/api
+```
+
+Copie .env.example para .env apenas se ainda não tiver um arquivo local.
+Veja [migrações](database/README.md), [contratos HTTP](backend/README.md)
+e [revisão técnica](docs/REVISAO_TECNICA.md).
+
+## Verificação
+
+```bash
+cd backend
+CGO_ENABLED=0 go test ./...
+CGO_ENABLED=0 go vet ./...
+cd ../frontend
+npm ci
+npm run lint
+npm run build
+```
+
+O Compose e o servidor Vite fornecidos são para desenvolvimento.
+Produção exige HTTPS, segredo JWT exclusivo, provisionamento administrativo,
+serviço de e-mail e publicação dos arquivos compilados do front-end.
+
 ## Próximos passos
 
-1. Modelar entidades como hóspedes, quartos, reservas e pagamentos.
-2. Criar as telas operacionais de reservas.
+1. Concluir endpoints de quartos e telas operacionais de hóspedes/categorias/quartos.
+2. Adicionar testes de integração com PostgreSQL.
+3. Implementar reservas, check-in/out e pagamentos.
