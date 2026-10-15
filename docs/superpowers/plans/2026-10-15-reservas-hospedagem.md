@@ -18,7 +18,7 @@
 - Só quartos com `is_available = true`, capacidade suficiente e sem conflito podem ser oferecidos.
 - A API calcula o número de diárias e o total usando moeda decimal; nunca usar `float64` para valores monetários.
 - A confirmação persiste a diária aplicada e o total, sem pagamento ou aprovação manual.
-- A reserva pública exige nome, tipo de documento (`RG` ou `CPF`), número e e-mail; não valida formalmente o documento.
+- A reserva pública exige nome, tipo de documento (`RG` ou `CPF`), número e e-mail; sua interface mascara e valida os dígitos do CPF antes da revisão. O RG permanece sem máscara fixa e a API conserva validação de campos obrigatórios e tamanho.
 - Registros legados mantêm tipo de documento `NULL` até classificação explícita pela recepção.
 - O contato informado na reserva é salvo em snapshot e não substitui os dados principais do hóspede.
 - Rotas atuais de gestão de hóspedes e quartos permanecem autenticadas; a API pública não retorna dados cadastrais.

@@ -49,6 +49,19 @@ export function localDateString(date: Date) {
   return `${date.getFullYear()}-${month}-${day}`
 }
 
+export function addCalendarDays(value: string, days: number) {
+  if (!value) return ''
+  const [year, month, day] = value.split('-').map(Number)
+  const date = new Date(year, month - 1, day)
+  date.setDate(date.getDate() + days)
+  return localDateString(date)
+}
+
+export function formatReservationDate(value: string) {
+  const [year, month, day] = value.split('-').map(Number)
+  return new Intl.DateTimeFormat('pt-BR').format(new Date(year, month - 1, day))
+}
+
 export async function searchAvailability(input: { checkIn: string, checkOut: string, occupants: number }) {
   const query = new URLSearchParams({ checkIn: input.checkIn, checkOut: input.checkOut, occupants: String(input.occupants) })
   const result = await publicRequest<{ rooms: AvailabilityOption[] }>(`/public/availability?${query}`)

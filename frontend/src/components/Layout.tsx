@@ -6,6 +6,7 @@ const linkClassName = ({ isActive }: { isActive: boolean }) =>
 export function Layout() {
   return (
     <div className="flex min-h-screen flex-col">
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-forest focus:px-4 focus:py-3 focus:text-cream focus:outline-none focus:ring-4 focus:ring-orange/50">Pular para o conteúdo principal</a>
       <header className="border-b border-forest/10 bg-cream/90 backdrop-blur">
         <nav className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4 sm:px-8" aria-label="Navegação principal">
           <NavLink to="/reservar" className="flex items-center gap-2 text-forest">
@@ -18,7 +19,7 @@ export function Layout() {
           </div>
         </nav>
       </header>
-      <main className="flex flex-1 flex-col"><Outlet /></main>
+      <main id="main-content" tabIndex={-1} className="flex flex-1 flex-col"><Outlet /></main>
       <footer className="border-t border-forest/10 bg-cream px-5 py-5 text-center text-sm text-ink/60">
         Hotel Laranjeira · Hospitalidade que começa no detalhe.
       </footer>

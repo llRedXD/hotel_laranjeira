@@ -55,7 +55,7 @@ Ainda não existem reservas, calendário de ocupação, consulta de disponibilid
 - O intervalo de ocupação é `[check-in, check-out)`: o quarto fica ocupado na noite anterior ao check-out e pode receber outra chegada na própria data do check-out.
 - Um quarto só pode ser reservado se estiver habilitado (`is_available = true`) e não tiver outra reserva ocupando qualquer noite do período solicitado.
 - O servidor repete a consulta de conflito dentro da operação de gravação, com proteção transacional no PostgreSQL, para impedir dupla reserva sob concorrência.
-- Documento deve registrar explicitamente o tipo RG ou CPF. Números devem ser normalizados para comparação e unicidade; o projeto ainda não valida formato de RG/CPF.
+- Documento deve registrar explicitamente o tipo RG ou CPF. Números devem ser normalizados para comparação e unicidade. A interface pública mascara o CPF e valida seus dígitos verificadores antes da revisão; o backend não valida formalmente CPF ou RG, e o RG permanece sem máscara fixa por variar de formato.
 - A confirmação da reserva é imediata; não há etapa de pagamento nem aprovação manual nesta entrega.
 
 ## Dados e API
@@ -104,7 +104,7 @@ O fluxo público deve apresentar apenas informações necessárias para escolher
 - Cadastros existentes mantêm tipo de documento desconhecido até a recepção classificá-los; não inferir RG/CPF pelos números já armazenados.
 - A reserva pública reutiliza um cadastro quando encontra o mesmo número de documento normalizado. Para cadastros legados sem tipo, preserva o tipo desconhecido no registro principal e guarda o tipo informado na reserva.
 - Se o e-mail informado na reserva divergir do e-mail principal do hóspede, salvar o informado como contato da reserva sem alterar o registro principal.
-- RG e CPF serão armazenados com seu tipo. Validação formal do número (incluindo dígitos verificadores) fica para uma decisão posterior, pois RG tem formatos variáveis e o escopo não definiu validação documental.
+- RG e CPF serão armazenados com seu tipo. Na interface pública, CPF recebe máscara e validação dos dígitos verificadores antes da revisão; RG aceita formatos variáveis sem máscara fixa. A validação é uma ajuda de entrada no navegador; a API mantém a validação atual de campos obrigatórios e tamanho.
 
 ## Pontos para o plano de implementação
 
