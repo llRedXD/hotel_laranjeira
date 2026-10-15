@@ -13,15 +13,16 @@ func (f *patchString) UnmarshalJSON(data []byte) error {
 }
 
 type guestPatchRequest struct {
-	Name     patchString `json:"name"`
-	Document patchString `json:"document"`
-	Email    patchString `json:"email"`
-	Phone    patchString `json:"phone"`
-	Address  patchString `json:"address"`
+	Name         patchString `json:"name"`
+	DocumentType patchString `json:"documentType"`
+	Document     patchString `json:"document"`
+	Email        patchString `json:"email"`
+	Phone        patchString `json:"phone"`
+	Address      patchString `json:"address"`
 }
 
 func (p guestPatchRequest) domain() hotel.GuestPatch {
-	return hotel.GuestPatch{Name: p.Name.Field, Document: p.Document.Field, Email: p.Email.Field, Phone: p.Phone.Field, Address: p.Address.Field}
+	return hotel.GuestPatch{Name: p.Name.Field, DocumentType: p.DocumentType.Field, Document: p.Document.Field, Email: p.Email.Field, Phone: p.Phone.Field, Address: p.Address.Field}
 }
 
 type categoryPatchRequest struct {

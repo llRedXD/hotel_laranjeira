@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -35,11 +36,7 @@ func TestPostgresPartialUpdates(t *testing.T) {
 	if _, err = tx.Exec(ctx, "SET LOCAL search_path TO "+schema+", public"); err != nil {
 		t.Fatal(err)
 	}
-	migration, err := os.ReadFile("../../../database/migrations/003_create_guests_and_rooms.sql")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = tx.Exec(ctx, string(migration)); err != nil {
+	if err = applyReservationTestSchema(ctx, tx); err != nil {
 		t.Fatal(err)
 	}
 	service := NewService(NewPostgresRepository(tx))
@@ -123,5 +120,113 @@ func TestPostgresPartialUpdates(t *testing.T) {
 	}
 	if _, err = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT room_conflict"); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func applyReservationTestSchema(ctx context.Context, tx pgx.Tx) error {
+	for _, name := range []string{"003_create_guests_and_rooms.sql", "005_reservations.sql"} {
+		migration, err := os.ReadFile("../../../database/migrations/" + name)
+		if err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, string(migration)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func TestReservationMigrationPreservesLegacyGuest(t *testing.T) {
+	dsn := os.Getenv("TEST_DATABASE_URL")
+	if dsn == "" {
+		t.Skip("TEST_DATABASE_URL ausente: integração PostgreSQL não executada")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	conn, err := pgx.Connect(ctx, dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close(context.Background())
+	tx, err := conn.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback(context.Background())
+	schema := pgx.Identifier{fmt.Sprintf("hotel_migration_test_%d", time.Now().UnixNano())}.Sanitize()
+	if _, err = tx.Exec(ctx, "CREATE SCHEMA "+schema); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(ctx, "SET LOCAL search_path TO "+schema+", public"); err != nil {
+		t.Fatal(err)
+	}
+	base, err := os.ReadFile("../../../database/migrations/003_create_guests_and_rooms.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(ctx, string(base)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(ctx, `INSERT INTO guests (name, document) VALUES ('Legado', '12.345-X')`); err != nil {
+		t.Fatal(err)
+	}
+	migration, err := os.ReadFile("../../../database/migrations/005_reservations.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(ctx, string(migration)); err != nil {
+		t.Fatal(err)
+	}
+	var document string
+	var documentType *string
+	var normalized string
+	if err = tx.QueryRow(ctx, `SELECT document, document_type, document_normalized FROM guests WHERE name='Legado'`).Scan(&document, &documentType, &normalized); err != nil {
+		t.Fatal(err)
+	}
+	if document != "12.345-X" || documentType != nil || normalized != "12345X" {
+		t.Fatalf("legacy document changed: document=%q type=%v normalized=%q", document, documentType, normalized)
+	}
+}
+
+func TestReservationMigrationRejectsNormalizedDocumentCollision(t *testing.T) {
+	dsn := os.Getenv("TEST_DATABASE_URL")
+	if dsn == "" {
+		t.Skip("TEST_DATABASE_URL ausente: integração PostgreSQL não executada")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	conn, err := pgx.Connect(ctx, dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close(context.Background())
+	tx, err := conn.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback(context.Background())
+	schema := pgx.Identifier{fmt.Sprintf("hotel_collision_test_%d", time.Now().UnixNano())}.Sanitize()
+	if _, err = tx.Exec(ctx, "CREATE SCHEMA "+schema); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(ctx, "SET LOCAL search_path TO "+schema+", public"); err != nil {
+		t.Fatal(err)
+	}
+	base, err := os.ReadFile("../../../database/migrations/003_create_guests_and_rooms.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(ctx, string(base)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(ctx, `INSERT INTO guests (name, document) VALUES ('A', '123.456-7'), ('B', '1234567')`); err != nil {
+		t.Fatal(err)
+	}
+	migration, err := os.ReadFile("../../../database/migrations/005_reservations.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(ctx, string(migration)); err == nil || !strings.Contains(err.Error(), "documentos duplicados após normalização") {
+		t.Fatalf("expected clear migration collision error, got %v", err)
 	}
 }

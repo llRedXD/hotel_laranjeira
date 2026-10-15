@@ -46,6 +46,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return response.json() as Promise<T>
 }
 
+export function publicRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+  return request<T>(path, options)
+}
+
 export async function login(email: string, password: string) {
   const session = await request<Session>('/auth/login', {
     method: 'POST',

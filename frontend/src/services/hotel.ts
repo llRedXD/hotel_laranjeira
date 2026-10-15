@@ -1,9 +1,11 @@
 import { authenticatedRequest } from './api'
+import type { AvailabilityOption, StaffReservationInput } from './reservations'
 
 export type Resource = 'guests' | 'categories' | 'rooms'
 export type Entity = {
   id: string
   name?: string
+  documentType?: 'RG' | 'CPF' | null
   document?: string | null
   email?: string | null
   phone?: string | null
@@ -41,6 +43,17 @@ export async function saveEntity(resource: Resource, id: string | undefined, val
 }
 export async function changeAvailability(id: string, available: boolean) {
   await authenticatedRequest(`/rooms/${id}/availability`, { method: 'PATCH', body: JSON.stringify({ isAvailable: available }) })
+}
+export async function searchReservationAvailability(input: { checkIn: string, checkOut: string, occupants: number }) {
+  const query = new URLSearchParams({ checkIn: input.checkIn, checkOut: input.checkOut, occupants: String(input.occupants) })
+  const result = await authenticatedRequest<{ rooms: AvailabilityOption[] }>(`/reservations/availability?${query}`)
+  return result.rooms
+}
+export async function createStaffReservation(input: StaffReservationInput) {
+  return authenticatedRequest<{ reservation: {
+    id: string, guestId: string, roomId: string, checkIn: string, checkOut: string,
+    occupants: number, dailyRate: string, totalAmount: string, guestName: string,
+  } }>('/reservations', { method: 'POST', body: JSON.stringify(input) })
 }
 export async function allCategories(): Promise<Entity[]> {
   return listAll('categories')

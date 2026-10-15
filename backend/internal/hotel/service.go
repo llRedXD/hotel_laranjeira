@@ -13,7 +13,7 @@ type Field struct {
 	Set   bool
 	Value *string
 }
-type GuestPatch struct{ Name, Document, Email, Phone, Address Field }
+type GuestPatch struct{ Name, DocumentType, Document, Email, Phone, Address Field }
 type CategoryPatch struct{ Name, Description Field }
 type ValidationError struct{ Fields map[string]string }
 
@@ -30,6 +30,8 @@ type Repository interface {
 	CreateCategory(context.Context, CategoryInput) (RoomCategory, error)
 	UpdateCategory(context.Context, string, CategoryPatch) (RoomCategory, error)
 	ListCategories(context.Context, int, int) ([]RoomCategory, error)
+	ListAvailability(context.Context, AvailabilityQuery) ([]AvailabilityOption, error)
+	CreateReservation(context.Context, ReservationInput) (Reservation, error)
 }
 
 type Service struct{ repository Repository }
@@ -59,10 +61,11 @@ func normalize(f Field, key string, max int, required bool, fields map[string]st
 
 func validateGuestPatch(p GuestPatch) (GuestPatch, error) {
 	fields := map[string]string{}
-	if !p.Name.Set && !p.Document.Set && !p.Email.Set && !p.Phone.Set && !p.Address.Set {
+	if !p.Name.Set && !p.DocumentType.Set && !p.Document.Set && !p.Email.Set && !p.Phone.Set && !p.Address.Set {
 		fields["body"] = "Informe ao menos um campo."
 	}
 	p.Name = normalize(p.Name, "name", 120, true, fields)
+	p.DocumentType = normalize(p.DocumentType, "documentType", 3, false, fields)
 	p.Document = normalize(p.Document, "document", 30, false, fields)
 	p.Email = normalize(p.Email, "email", 255, false, fields)
 	p.Phone = normalize(p.Phone, "phone", 30, false, fields)
@@ -70,10 +73,18 @@ func validateGuestPatch(p GuestPatch) (GuestPatch, error) {
 	if p.Email.Value != nil {
 		email := strings.ToLower(*p.Email.Value)
 		address, err := mail.ParseAddress(email)
-		if err != nil || address.Address != email || !strings.Contains(strings.SplitN(email, "@", 2)[1], ".") {
+		parts := strings.Split(email, "@")
+		if len(parts) != 2 || err != nil || address.Address != email || !strings.Contains(parts[1], ".") {
 			fields["email"] = "Informe um e-mail válido."
 		}
 		p.Email.Value = &email
+	}
+	if p.DocumentType.Value != nil {
+		value := strings.ToUpper(*p.DocumentType.Value)
+		if value != "RG" && value != "CPF" {
+			fields["documentType"] = "Selecione RG ou CPF."
+		}
+		p.DocumentType.Value = &value
 	}
 	if len(fields) > 0 {
 		return p, &ValidationError{Fields: fields}
@@ -95,11 +106,15 @@ func validateCategoryPatch(p CategoryPatch) (CategoryPatch, error) {
 }
 
 func (s *Service) CreateGuest(ctx context.Context, in GuestInput) (Guest, error) {
-	p, err := validateGuestPatch(GuestPatch{Field{true, &in.Name}, Field{true, in.Document}, Field{true, in.Email}, Field{true, in.Phone}, Field{true, in.Address}})
+	p, err := validateGuestPatch(GuestPatch{
+		Name: Field{Set: true, Value: &in.Name}, DocumentType: Field{Set: true, Value: in.DocumentType},
+		Document: Field{Set: true, Value: in.Document}, Email: Field{Set: true, Value: in.Email},
+		Phone: Field{Set: true, Value: in.Phone}, Address: Field{Set: true, Value: in.Address},
+	})
 	if err != nil {
 		return Guest{}, err
 	}
-	return s.repository.CreateGuest(ctx, GuestInput{*p.Name.Value, p.Document.Value, p.Email.Value, p.Phone.Value, p.Address.Value})
+	return s.repository.CreateGuest(ctx, GuestInput{Name: *p.Name.Value, DocumentType: p.DocumentType.Value, Document: p.Document.Value, Email: p.Email.Value, Phone: p.Phone.Value, Address: p.Address.Value})
 }
 func (s *Service) UpdateGuest(ctx context.Context, id string, p GuestPatch) (Guest, error) {
 	p, err := validateGuestPatch(p)

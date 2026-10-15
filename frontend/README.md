@@ -1,7 +1,7 @@
 # Front-end
 
-Interface de acesso da equipe com login, recuperação, redefinição e painel demonstrativo.
-As telas operacionais de hóspedes e quartos ainda estão pendentes.
+Interface pública de reserva de quartos e painel autenticado para a recepção,
+além de login, recuperação de acesso e gestão de cadastros.
 
 ## Tecnologias
 
@@ -33,3 +33,8 @@ FRONTEND_ORIGIN no back-end deve corresponder à origem do navegador.
 Use authenticatedRequest em serviços protegidos: mantém access token em memória
 e tenta uma renovação ao receber 401. Renovações concorrentes na mesma aba
 compartilham uma chamada. Cookie refresh é HttpOnly.
+
+O fluxo público está em `/reservar` e não exige conta. A recepção cria reservas
+em `/reservas`, dentro do painel autenticado. Ambos consultam a API para obter
+diárias, noites e total previsto; o servidor é a fonte do preço e revalida
+conflitos ao confirmar.
