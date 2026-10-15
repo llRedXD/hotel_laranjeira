@@ -34,3 +34,26 @@ func TestNormalizeUnicodeAndBlankOptional(t *testing.T) {
 		t.Fatalf("%+v %v", p, err)
 	}
 }
+
+func TestGuestDocumentTypeValidation(t *testing.T) {
+	documentType, document := " cpf ", "123.456.789-01"
+	validated, err := validateGuestPatch(GuestPatch{
+		Name:         Field{Set: true, Value: stringPointer("Ana")},
+		DocumentType: Field{Set: true, Value: &documentType},
+		Document:     Field{Set: true, Value: &document},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if validated.DocumentType.Value == nil || *validated.DocumentType.Value != "CPF" {
+		t.Fatalf("document type was not normalized: %+v", validated.DocumentType.Value)
+	}
+	invalid := "Passaporte"
+	_, err = validateGuestPatch(GuestPatch{Name: Field{Set: true, Value: stringPointer("Ana")}, DocumentType: Field{Set: true, Value: &invalid}})
+	var validation *ValidationError
+	if !errors.As(err, &validation) || validation.Fields["documentType"] == "" {
+		t.Fatalf("invalid document type accepted: %v", err)
+	}
+}
+
+func stringPointer(value string) *string { return &value }

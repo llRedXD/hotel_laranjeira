@@ -25,14 +25,17 @@ consulte a adoção de histórico em [DOCKER.md](../docs/DOCKER.md).
 | 002 | refresh tokens e recuperação |
 | 003 | hóspedes, categorias e quartos |
 | 004 | versão de autenticação para revogação após troca de senha |
+| 005 | tipo e normalização de documento; reservas, snapshots e índices por quarto/período |
 
-Exemplo para banco que já tem 001–003 (na raiz; credenciais padrão de DEV):
+Para banco existente, aplique as versões pendentes pelo executor versionado (na raiz; credenciais padrão de DEV):
 
 ```bash
-docker compose exec -T database psql -U hotel_laranjeira -d hotel_laranjeira -v ON_ERROR_STOP=1 --single-transaction < database/migrations/004_auth_version.sql
+docker compose exec -T database psql -U hotel_laranjeira -d hotel_laranjeira -v ON_ERROR_STOP=1 < database/migrate.sql
 ```
 
-Execute 003 antes de 004 se ainda não estiver aplicada, trocando o caminho.
-Não reaplique arquivos já executados. Faça backup antes de evoluir dados importantes.
-As migrações não removem dados. Não é necessário excluir volumes.
+O executor registra versões e aplica apenas as que faltam. A migração 005
+preserva o texto de documentos existentes e interrompe com erro se encontrar
+colisões após a normalização; resolva os registros duplicados antes de tentar
+novamente. Faça backup antes de evoluir dados importantes. As migrações não
+removem dados. Não é necessário excluir volumes.
 Em banco novo, o serviço migrate aplica todos os arquivos automaticamente.
