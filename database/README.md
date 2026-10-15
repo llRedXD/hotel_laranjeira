@@ -39,3 +39,19 @@ colisões após a normalização; resolva os registros duplicados antes de tenta
 novamente. Faça backup antes de evoluir dados importantes. As migrações não
 removem dados. Não é necessário excluir volumes.
 Em banco novo, o serviço migrate aplica todos os arquivos automaticamente.
+
+## Dados de demonstração
+
+Use somente no banco local de desenvolvimento. O script apaga todos os dados
+atuais de reservas, hóspedes, quartos e categorias antes de carregar a base de
+demonstração. Para executá-lo na raiz do projeto:
+
+```bash
+docker-compose exec -T database psql -U hotel_laranjeira -d hotel_laranjeira -v ON_ERROR_STOP=1 < database/seed_demo.sql
+```
+
+O script recria categorias, quartos, hóspedes e reservas em uma transação.
+Ele preserva as contas de usuário, sessões/tokens de autenticação, tokens de
+redefinição de senha e o histórico de migrações. A base inclui uma reserva
+futura no quarto 101 para demonstrar conflito de período; as datas são
+calculadas em relação ao dia em que o script é executado.
