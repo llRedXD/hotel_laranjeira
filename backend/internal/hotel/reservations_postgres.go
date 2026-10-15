@@ -3,6 +3,8 @@ package hotel
 import (
 	"context"
 	"errors"
+	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -37,6 +39,61 @@ func (s *PostgresRepository) ListAvailability(ctx context.Context, query Availab
 		options = append(options, option)
 	}
 	return options, rows.Err()
+}
+
+func (s *PostgresRepository) ListReservations(ctx context.Context, query ReservationQuery) ([]Reservation, int, error) {
+	search := strings.TrimSpace(query.Search)
+	var from, to any
+	if !query.From.IsZero() {
+		from = query.From
+	}
+	if !query.To.IsZero() {
+		to = query.To
+	}
+	const where = `($1 = '' OR r.guest_name_snapshot ILIKE '%' || $1 || '%' OR rm.number ILIKE '%' || $1 || '%' OR r.document_snapshot ILIKE '%' || $1 || '%')
+		AND ($2::date IS NULL OR r.check_in >= $2::date)
+		AND ($3::date IS NULL OR r.check_in <= $3::date)`
+	var total int
+	if err := s.db.QueryRow(ctx, `SELECT count(*) FROM reservations r JOIN rooms rm ON rm.id = r.room_id WHERE `+where,
+		search, from, to).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	rows, err := s.db.Query(ctx, `SELECT r.id, r.guest_id, r.room_id, r.check_in, r.check_out, r.occupants,
+		r.daily_rate::text, r.total_amount::text, r.guest_name_snapshot, r.document_type_snapshot,
+		r.document_snapshot, r.contact_email_snapshot, r.created_at, rm.number, c.name
+		FROM reservations r JOIN rooms rm ON rm.id = r.room_id JOIN room_categories c ON c.id = rm.category_id
+		WHERE `+where+` ORDER BY CASE
+			WHEN r.check_in <= CURRENT_DATE AND r.check_out > CURRENT_DATE THEN 0
+			WHEN r.check_in > CURRENT_DATE THEN 1 ELSE 2 END,
+		r.check_in ASC, r.created_at DESC, r.id LIMIT $4 OFFSET $5`,
+		search, from, to, query.Limit, query.Offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	reservations := make([]Reservation, 0)
+	for rows.Next() {
+		var reservation Reservation
+		if err := rows.Scan(&reservation.ID, &reservation.GuestID, &reservation.RoomID,
+			&reservation.CheckIn, &reservation.CheckOut, &reservation.Occupants, &reservation.DailyRate,
+			&reservation.TotalAmount, &reservation.GuestName, &reservation.DocumentType, &reservation.Document,
+			&reservation.ContactEmail, &reservation.CreatedAt, &reservation.RoomNumber, &reservation.CategoryName); err != nil {
+			return nil, 0, err
+		}
+		reservations = append(reservations, reservation)
+	}
+	return reservations, total, rows.Err()
+}
+
+func (s *PostgresRepository) ReservationSummary(ctx context.Context, date time.Time) (ReservationSummary, error) {
+	var summary ReservationSummary
+	err := s.db.QueryRow(ctx, `SELECT
+		COALESCE((SELECT sum(occupants) FROM reservations WHERE check_in <= $1 AND check_out > $1), 0)::int,
+		(SELECT count(*) FROM reservations WHERE check_in = $1),
+		(SELECT count(*) FROM rooms rm WHERE rm.is_available = TRUE AND NOT EXISTS (
+			SELECT 1 FROM reservations r WHERE r.room_id = rm.id AND r.check_in <= $1 AND r.check_out > $1
+		))`, date).Scan(&summary.GuestsInHouse, &summary.CheckInsToday, &summary.AvailableRooms)
+	return summary, err
 }
 
 func (s *PostgresRepository) CreateReservation(ctx context.Context, input ReservationInput) (Reservation, error) {

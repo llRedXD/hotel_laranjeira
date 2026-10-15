@@ -86,6 +86,8 @@ validação formal de RG/CPF.
 | GET `/api/v1/public/availability` | público | `checkIn`, `checkOut` (`YYYY-MM-DD`), `occupants` | `rooms` com quarto, categoria, capacidade, diária, noites e total estimado |
 | POST `/api/v1/public/reservations` | público | `roomId`, datas, `occupants`, `expectedDailyRate`, `guest` (`name`, `documentType`, `document`, `email`) | 201, confirmação sem documento nem e-mail |
 | GET `/api/v1/reservations/availability` | Bearer JWT | mesmos filtros públicos | `rooms` com disponibilidade e preço estimado |
+| GET `/api/v1/reservations` | Bearer JWT | `search`, `from`, `to`, `limit`, `offset` opcionais | `reservations` paginadas e `total`; busca por hóspede, documento ou quarto; `from`/`to` filtram a data de entrada |
+| GET `/api/v1/reservations/summary` | Bearer JWT | `date` (`YYYY-MM-DD`) | `summary` com hóspedes no hotel, check-ins e quartos livres na data |
 | POST `/api/v1/reservations` | Bearer JWT | `roomId`, datas, `occupants`, `expectedDailyRate`, `guestId` | 201, reserva operacional |
 
 O intervalo é `[checkIn, checkOut)`: uma nova reserva pode começar no dia do

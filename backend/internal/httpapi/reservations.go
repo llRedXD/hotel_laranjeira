@@ -38,6 +38,8 @@ type reservationDateResponse struct {
 	DocumentType string `json:"documentType,omitempty"`
 	Document     string `json:"document,omitempty"`
 	ContactEmail string `json:"contactEmail,omitempty"`
+	RoomNumber   string `json:"roomNumber,omitempty"`
+	CategoryName string `json:"categoryName,omitempty"`
 }
 
 func (a *api) publicAvailability(w http.ResponseWriter, r *http.Request) {
@@ -67,6 +69,71 @@ func (a *api) staffAvailability(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"rooms": rooms})
+}
+
+func (a *api) listReservations(w http.ResponseWriter, r *http.Request) {
+	if !a.requireAuth(w, r) {
+		return
+	}
+	limit, offset, ok := pagination(w, r)
+	if !ok {
+		return
+	}
+	search := r.URL.Query().Get("search")
+	if len(search) > 255 {
+		writeValidationError(w, map[string]string{"search": "Busca excede 255 bytes."})
+		return
+	}
+	from, err := parseOptionalDate(r.URL.Query().Get("from"))
+	if err != nil {
+		writeValidationError(w, map[string]string{"from": "Use uma data válida no formato AAAA-MM-DD."})
+		return
+	}
+	to, err := parseOptionalDate(r.URL.Query().Get("to"))
+	if err != nil {
+		writeValidationError(w, map[string]string{"to": "Use uma data válida no formato AAAA-MM-DD."})
+		return
+	}
+	reservations, total, err := a.hotel.ListReservations(r.Context(), hotel.ReservationQuery{
+		Search: search, From: from, To: to, Limit: limit, Offset: offset,
+	})
+	if writeReservationError(w, err) {
+		return
+	}
+	items := make([]reservationDateResponse, 0, len(reservations))
+	for _, reservation := range reservations {
+		items = append(items, reservationDateResponse{
+			ID: reservation.ID, GuestID: reservation.GuestID, RoomID: reservation.RoomID,
+			CheckIn: reservation.CheckIn.Format("2006-01-02"), CheckOut: reservation.CheckOut.Format("2006-01-02"),
+			Occupants: reservation.Occupants, DailyRate: reservation.DailyRate, TotalAmount: reservation.TotalAmount,
+			GuestName: reservation.GuestName, DocumentType: reservation.DocumentType, Document: reservation.Document,
+			ContactEmail: reservation.ContactEmail, RoomNumber: reservation.RoomNumber, CategoryName: reservation.CategoryName,
+		})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"reservations": items, "total": total})
+}
+
+func (a *api) reservationSummary(w http.ResponseWriter, r *http.Request) {
+	if !a.requireAuth(w, r) {
+		return
+	}
+	date, err := parseOptionalDate(r.URL.Query().Get("date"))
+	if err != nil || date.IsZero() {
+		writeValidationError(w, map[string]string{"date": "Informe uma data no formato AAAA-MM-DD."})
+		return
+	}
+	summary, err := a.hotel.ReservationSummary(r.Context(), date)
+	if writeReservationError(w, err) {
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"summary": summary})
+}
+
+func parseOptionalDate(value string) (time.Time, error) {
+	if value == "" {
+		return time.Time{}, nil
+	}
+	return time.Parse("2006-01-02", value)
 }
 
 func (a *api) createPublicReservation(w http.ResponseWriter, r *http.Request) {

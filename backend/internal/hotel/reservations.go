@@ -65,6 +65,22 @@ type Reservation struct {
 	Document     string    `json:"document"`
 	ContactEmail string    `json:"contactEmail"`
 	CreatedAt    time.Time `json:"createdAt"`
+	RoomNumber   string    `json:"roomNumber"`
+	CategoryName string    `json:"categoryName"`
+}
+
+type ReservationQuery struct {
+	Search string
+	From   time.Time
+	To     time.Time
+	Limit  int
+	Offset int
+}
+
+type ReservationSummary struct {
+	GuestsInHouse  int `json:"guestsInHouse"`
+	CheckInsToday  int `json:"checkInsToday"`
+	AvailableRooms int `json:"availableRooms"`
 }
 
 func (s *Service) ListAvailability(ctx context.Context, query AvailabilityQuery) ([]AvailabilityOption, error) {
@@ -105,6 +121,32 @@ func (s *Service) CreateReservation(ctx context.Context, input ReservationInput)
 		return Reservation{}, &ValidationError{Fields: fields}
 	}
 	return s.repository.CreateReservation(ctx, input)
+}
+
+func (s *Service) ListReservations(ctx context.Context, query ReservationQuery) ([]Reservation, int, error) {
+	if len(query.Search) > 255 || query.Limit < 1 || query.Limit > 100 || query.Offset < 0 || query.Offset > 100000 {
+		return nil, 0, &ValidationError{Fields: map[string]string{"filters": "Filtros inválidos."}}
+	}
+	if (!query.From.IsZero() && !isCivilDate(query.From)) || (!query.To.IsZero() && !isCivilDate(query.To)) ||
+		(!query.From.IsZero() && !query.To.IsZero() && query.To.Before(query.From)) {
+		return nil, 0, &ValidationError{Fields: map[string]string{"dates": "Informe um intervalo válido."}}
+	}
+	reader, ok := s.repository.(reservationReader)
+	if !ok {
+		return nil, 0, fmt.Errorf("repositório não oferece consulta de reservas")
+	}
+	return reader.ListReservations(ctx, query)
+}
+
+func (s *Service) ReservationSummary(ctx context.Context, date time.Time) (ReservationSummary, error) {
+	if !isCivilDate(date) {
+		return ReservationSummary{}, &ValidationError{Fields: map[string]string{"date": "Informe uma data válida."}}
+	}
+	reader, ok := s.repository.(reservationReader)
+	if !ok {
+		return ReservationSummary{}, fmt.Errorf("repositório não oferece resumo de reservas")
+	}
+	return reader.ReservationSummary(ctx, date)
 }
 
 func validateAvailabilityQuery(query AvailabilityQuery) error {

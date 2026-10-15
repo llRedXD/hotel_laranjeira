@@ -18,6 +18,18 @@ export type Entity = {
   dailyRate?: string
   isAvailable?: boolean
 }
+export type ReceptionReservation = {
+  id: string
+  checkIn: string
+  checkOut: string
+  occupants: number
+  dailyRate: string
+  totalAmount: string
+  guestName: string
+  roomNumber: string
+  categoryName: string
+}
+export type ReservationSummary = { guestsInHouse: number, checkInsToday: number, availableRooms: number }
 const paths: Record<Resource, string> = { guests: '/guests', categories: '/room-categories', rooms: '/rooms' }
 export const pageSize = 20
 export async function listEntities(resource: Resource, query: URLSearchParams): Promise<Entity[]> {
@@ -54,6 +66,14 @@ export async function createStaffReservation(input: StaffReservationInput) {
     id: string, guestId: string, roomId: string, checkIn: string, checkOut: string,
     occupants: number, dailyRate: string, totalAmount: string, guestName: string,
   } }>('/reservations', { method: 'POST', body: JSON.stringify(input) })
+}
+export async function listReservations(query: URLSearchParams) {
+  return authenticatedRequest<{ reservations: ReceptionReservation[], total: number }>(`/reservations?${query}`)
+}
+export async function getReservationSummary(date: string) {
+  const query = new URLSearchParams({ date })
+  const result = await authenticatedRequest<{ summary: ReservationSummary }>(`/reservations/summary?${query}`)
+  return result.summary
 }
 export async function allCategories(): Promise<Entity[]> {
   return listAll('categories')

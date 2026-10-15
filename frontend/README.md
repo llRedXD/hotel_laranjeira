@@ -35,6 +35,7 @@ e tenta uma renovação ao receber 401. Renovações concorrentes na mesma aba
 compartilham uma chamada. Cookie refresh é HttpOnly.
 
 O fluxo público está em `/reservar` e não exige conta. A recepção cria reservas
-em `/reservas`, dentro do painel autenticado. Ambos consultam a API para obter
+em `/reservas/nova`, dentro do painel autenticado. A consulta das reservas fica em
+`/reservas`, também no painel. Ambos os formulários consultam a API para obter
 diárias, noites e total previsto; o servidor é a fonte do preço e revalida
 conflitos ao confirmar.

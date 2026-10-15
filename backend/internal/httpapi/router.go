@@ -34,6 +34,8 @@ func NewRouter(db *pgxpool.Pool, cfg config.Config) http.Handler {
 	mux.HandleFunc("GET /api/v1/public/availability", api.publicAvailability)
 	mux.HandleFunc("POST /api/v1/public/reservations", api.createPublicReservation)
 	mux.HandleFunc("GET /api/v1/reservations/availability", api.staffAvailability)
+	mux.HandleFunc("GET /api/v1/reservations", api.listReservations)
+	mux.HandleFunc("GET /api/v1/reservations/summary", api.reservationSummary)
 	mux.HandleFunc("POST /api/v1/reservations", api.createStaffReservation)
 	mux.HandleFunc("POST /api/v1/auth/login", api.login)
 	mux.HandleFunc("POST /api/v1/auth/refresh", api.refresh)

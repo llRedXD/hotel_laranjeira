@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/mail"
 	"strings"
+	"time"
 	"unicode/utf8"
 )
 
@@ -32,6 +33,11 @@ type Repository interface {
 	ListCategories(context.Context, int, int) ([]RoomCategory, error)
 	ListAvailability(context.Context, AvailabilityQuery) ([]AvailabilityOption, error)
 	CreateReservation(context.Context, ReservationInput) (Reservation, error)
+}
+
+type reservationReader interface {
+	ListReservations(context.Context, ReservationQuery) ([]Reservation, int, error)
+	ReservationSummary(context.Context, time.Time) (ReservationSummary, error)
 }
 
 type Service struct{ repository Repository }
