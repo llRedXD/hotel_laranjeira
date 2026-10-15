@@ -8,6 +8,7 @@ export type FieldSpec = { key: string, label: string, required?: boolean, type?:
 const fields: Record<Resource, FieldSpec[]> = {
   guests: [
     { key: 'name', label: 'Nome completo', required: true, max: 120 },
+    { key: 'documentType', label: 'Tipo de documento' },
     { key: 'document', label: 'Documento', max: 30 },
     { key: 'email', label: 'E-mail', type: 'email', max: 255 },
     { key: 'phone', label: 'Telefone', type: 'tel', max: 30 },
@@ -91,7 +92,7 @@ export function EntityDialog({ resource, entity, readOnly, categories, onClose, 
       </> : <form onSubmit={submit} className="space-y-4">
         <p className="text-sm text-ink/60">Campos marcados com * são obrigatórios.</p>
         <fieldset disabled={busy} className="space-y-4">
-          {fields[resource].map(field => <FormField key={field.key} id={field.key} name={field.key} label={field.label + (field.required ? ' *' : '')}
+          {fields[resource].map(field => field.key === 'documentType' ? <div key={field.key}><label htmlFor={field.key} className="mb-1.5 block text-sm font-medium">{field.label}</label><select className={selectClass} id={field.key} name={field.key} defaultValue={value(field.key)} aria-invalid={!!errors[field.key]}><option value="">Não classificado</option><option value="RG">RG</option><option value="CPF">CPF</option></select>{errors[field.key] && <p role="alert" className="text-sm text-red-700">{errors[field.key]}</p>}</div> : <FormField key={field.key} id={field.key} name={field.key} label={field.label + (field.required ? ' *' : '')}
             type={field.type ?? 'text'} defaultValue={value(field.key)} required={field.required} maxLength={field.max}
             autoComplete={resource === 'guests' ? ({ name: 'name', email: 'email', phone: 'tel', address: 'street-address' }[field.key] ?? 'off') : 'off'}
             inputMode={resource === 'guests' && (field.key === 'document' || field.key === 'phone') ? 'tel' : undefined}

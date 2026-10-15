@@ -15,10 +15,10 @@ hotel_laranjeira/
 
 ## Front-end
 
-O front-end utiliza React, TypeScript, Vite e Tailwind CSS. Ele contém as
-páginas de login, recuperação e redefinição de senha. A rota inicial direciona
-ao login ou ao painel, conforme a sessão. O acesso à área
-interna é destinado à equipe autorizada; contas não são criadas publicamente.
+O front-end utiliza React, TypeScript, Vite e Tailwind CSS. O hóspede pode
+consultar e reservar em `/reservar` sem criar conta; a equipe acessa o painel
+autenticado, incluindo reservas da recepção. A rota inicial abre a busca pública
+de quartos; o painel e os cadastros continuam protegidos por autenticação.
 
 ### Executar localmente
 
@@ -64,8 +64,9 @@ antes de executar `CGO_ENABLED=0 go run ./cmd/api`.
 
 - Autenticação e painel React; métricas do painel são demonstrativas.
 - API de hóspedes e categorias com cadastro, consulta e edição.
-- Tabela de quartos existe; endpoints e telas operacionais ainda estão pendentes.
-- Reservas, pagamentos e check-in/out ainda não foram implementados.
+- API e telas operacionais de hóspedes, categorias e quartos.
+- Reservas públicas e da recepção, com cálculo de diárias, total previsto e proteção contra conflitos.
+- Pagamentos e registro do check-in/check-out realizado continuam fora desta entrega.
 
 ## API sem Docker
 
@@ -102,6 +103,5 @@ serviço de e-mail e publicação dos arquivos compilados do front-end.
 
 ## Próximos passos
 
-1. Concluir endpoints de quartos e telas operacionais de hóspedes/categorias/quartos.
-2. Adicionar testes de integração com PostgreSQL.
-3. Implementar reservas, check-in/out e pagamentos.
+1. Ampliar a gestão de reservas com cancelamento e histórico, conforme decisões futuras.
+2. Avaliar pagamentos e registro do check-in/check-out realizado em entregas separadas.

@@ -8,11 +8,12 @@ export function Layout() {
     <div className="flex min-h-screen flex-col">
       <header className="border-b border-forest/10 bg-cream/90 backdrop-blur">
         <nav className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4 sm:px-8" aria-label="Navegação principal">
-          <NavLink to="/" className="flex items-center gap-2 text-forest">
+          <NavLink to="/reservar" className="flex items-center gap-2 text-forest">
             <span className="grid size-9 place-items-center rounded-full bg-orange text-lg font-bold text-white">L</span>
             <span className="font-serif text-xl font-semibold tracking-tight">Hotel Laranjeira</span>
           </NavLink>
           <div className="flex items-center gap-4 text-sm font-medium sm:gap-6">
+            <NavLink to="/reservar" className={linkClassName}>Reservar</NavLink>
             <NavLink to="/login" className={linkClassName}>Entrar</NavLink>
           </div>
         </nav>
