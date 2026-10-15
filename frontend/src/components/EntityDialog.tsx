@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { APIError } from '../services/api'
+import { guestDocumentError } from '../services/guestDocument'
 import { saveEntity, type Entity, type Resource } from '../services/hotel'
 import { FormField } from './FormField'
 import { SubmitButton } from './SubmitButton'
@@ -51,6 +52,12 @@ export function EntityDialog({ resource, entity, readOnly, categories, onClose, 
     if (resource === 'guests') {
       values.document = values.document?.replace(/[^\dA-Za-z]/g, '').toUpperCase() || ''
       values.phone = values.phone?.replace(/\D/g, '') || ''
+      if (values.documentType === 'CPF') {
+        const documentError = guestDocumentError('CPF', values.document)
+        if (documentError) {
+          setErrors({ document: documentError }); setMessage('Revise os campos destacados.'); return
+        }
+      }
       if (values.phone && !/^\d{10,11}$/.test(values.phone)) {
         setErrors({ phone: 'Informe um telefone com DDD (10 ou 11 dígitos).' }); setMessage('Revise os campos destacados.'); return
       }
@@ -99,6 +106,8 @@ export function EntityDialog({ resource, entity, readOnly, categories, onClose, 
             pattern={resource === 'guests' && field.key === 'email' ? '^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$' : undefined}
             onChange={resource === 'guests' && (field.key === 'document' || field.key === 'phone') ? (event: ChangeEvent<HTMLInputElement>) => {
               event.currentTarget.value = field.key === 'document' ? formatDocument(event.currentTarget.value) : formatPhone(event.currentTarget.value)
+              setErrors(current => ({ ...current, [field.key]: '' }))
+              setMessage('')
             } : undefined}
             min={field.key === 'capacity' ? 1 : field.key === 'dailyRate' ? 0 : undefined}
             max={field.key === 'capacity' ? 2147483647 : field.key === 'dailyRate' ? '9999999999.99' : undefined}

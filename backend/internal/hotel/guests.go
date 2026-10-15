@@ -109,9 +109,21 @@ func (s *PostgresRepository) GetGuest(ctx context.Context, id string) (Guest, er
 }
 
 func (s *PostgresRepository) ListGuests(ctx context.Context, search string, limit, offset int) ([]Guest, error) {
+	search = strings.TrimSpace(search)
+	searchDocument := normalizeDocument(nil, &search)
 	rows, err := s.db.Query(ctx, `SELECT id, name, document_type, document, email, phone, address, created_at, updated_at
-		FROM guests WHERE $1 = '' OR name ILIKE '%' || $1 || '%' OR document ILIKE '%' || $1 || '%' OR email ILIKE '%' || $1 || '%'
-		ORDER BY name, id LIMIT $2 OFFSET $3`, strings.TrimSpace(search), limit, offset)
+		FROM guests
+		WHERE $1 = '' OR ($2 <> '' AND document_normalized ILIKE '%' || $2 || '%') OR name ILIKE '%' || $1 || '%' OR document ILIKE '%' || $1 || '%' OR email ILIKE '%' || $1 || '%'
+		ORDER BY
+			CASE
+				WHEN $2 <> '' AND document_normalized = $2 THEN 0
+				WHEN $2 <> '' AND document_normalized ILIKE '%' || $2 || '%' THEN 1
+				WHEN document ILIKE '%' || $1 || '%' THEN 2
+				WHEN name ILIKE '%' || $1 || '%' THEN 3
+				WHEN email ILIKE '%' || $1 || '%' THEN 4
+				ELSE 5
+			END,
+			name, id LIMIT $3 OFFSET $4`, search, searchDocument, limit, offset)
 	if err != nil {
 		return nil, err
 	}

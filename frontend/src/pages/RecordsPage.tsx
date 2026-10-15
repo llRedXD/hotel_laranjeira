@@ -4,7 +4,7 @@ import { EntityDialog } from '../components/EntityDialog'
 import { allCategories, changeAvailability, getEntity, listEntities, pageSize, type Entity, type Resource } from '../services/hotel'
 
 const content = {
-  guests: { title: 'Hóspedes', singular: 'hóspede', description: 'Informações de quem passa pelo Hotel Laranjeira.', search: 'Nome, e-mail ou documento' },
+  guests: { title: 'Hóspedes', singular: 'hóspede', description: 'Informações de quem passa pelo Hotel Laranjeira.', search: 'CPF ou RG; nome como alternativa' },
   categories: { title: 'Categorias', singular: 'categoria', description: 'Organize os tipos de acomodação do hotel.', search: '' },
   rooms: { title: 'Quartos', singular: 'quarto', description: 'Capacidade, diárias e disponibilidade em um só lugar.', search: 'Número do quarto' },
 }
@@ -67,7 +67,7 @@ export function RecordsPage({ resource }: { resource: Resource }) {
     <section aria-label="Consulta de registros" className="mt-8 overflow-hidden rounded-2xl border border-forest/10 bg-cream shadow-sm">
       <div className="flex flex-wrap items-end gap-3 border-b border-forest/10 p-5">
         {resource !== 'categories' && <form onSubmit={submitSearch} className="flex flex-1 flex-wrap items-end gap-2">
-          <div className="min-w-48 flex-1"><label htmlFor="search" className="mb-1 block text-sm text-ink/70">Buscar {info.title.toLowerCase()}</label><input id="search" name="search" maxLength={255} placeholder={info.search} className={control + ' w-full'} /></div>
+          <div className="min-w-48 flex-1"><label htmlFor="search" className="mb-1 block text-sm text-ink/70">{resource === 'guests' ? 'Buscar hóspede pelo documento' : `Buscar ${info.title.toLowerCase()}`}</label><input id="search" name="search" type={resource === 'guests' ? 'search' : 'text'} autoComplete="off" maxLength={255} placeholder={info.search} className={control + ' w-full'} />{resource === 'guests' && <p className="mt-1.5 text-xs text-ink/60">CPF e RG são priorizados nos resultados. Também é possível buscar pelo nome.</p>}</div>
           <button className={control + ' font-semibold text-forest'} type="submit">Buscar</button>
         </form>}
         {resource === 'rooms' && <>
@@ -79,14 +79,13 @@ export function RecordsPage({ resource }: { resource: Resource }) {
       {loading ? <p role="status" className="p-8 text-center text-ink/60">Carregando registros...</p> : error ? <div role="alert" className="p-6 text-red-700"><p>{error}</p><button type="button" onClick={() => setRevision(v => v + 1)} className={action}>Tentar novamente</button></div> : records.length === 0 ? <div className="p-12 text-center"><h2 className="font-serif text-2xl text-forest">Nenhum registro encontrado</h2><p className="mt-2 text-ink/60">{search || category || available ? 'Revise os filtros para ampliar sua busca.' : `Comece cadastrando ${info.singular === 'categoria' ? 'uma categoria' : 'um '+info.singular}.`}</p></div> :
         <div className="overflow-x-auto"><table className="w-full text-left text-sm">
           <caption className="sr-only">Lista de {info.title.toLowerCase()}</caption>
-          <thead className="bg-sand/60 text-xs tracking-wide text-ink/60 uppercase"><tr><th className="px-5 py-4">{resource === 'rooms' ? 'Quarto' : 'Nome'}</th>
-            {resource === 'guests' ? <><th className="px-5 py-4">Documento</th><th className="px-5 py-4">Contato</th></> : resource === 'categories' ? <th className="px-5 py-4">Descrição</th> : <><th className="px-5 py-4">Categoria</th><th className="px-5 py-4">Capacidade</th><th className="px-5 py-4">Diária</th><th className="px-5 py-4">Status</th></>}
+          <thead className="bg-sand/60 text-xs tracking-wide text-ink/60 uppercase"><tr>{resource === 'guests' ? <><th className="px-5 py-4">Documento</th><th className="px-5 py-4">Nome</th></> : <th className="px-5 py-4">{resource === 'rooms' ? 'Quarto' : 'Nome'}</th>}
+            {resource === 'guests' ? <th className="px-5 py-4">Contato</th> : resource === 'categories' ? <th className="px-5 py-4">Descrição</th> : <><th className="px-5 py-4">Categoria</th><th className="px-5 py-4">Capacidade</th><th className="px-5 py-4">Diária</th><th className="px-5 py-4">Status</th></>}
             <th className="px-5 py-4 text-right">Ações</th></tr></thead>
           <tbody className="divide-y divide-forest/10">{records.map(entity => <tr key={entity.id} className="hover:bg-sand/30">
-            <td className="max-w-64 break-words px-5 py-5 font-semibold text-forest">{entity.name ?? entity.number}</td>
-            {resource === 'guests' ? <><td className="px-5 py-5">{entity.document ? <>{entity.documentType ? `${entity.documentType}: ` : ''}{entity.document}{!entity.documentType && <span className="ml-2 text-xs text-orange">não classificado</span>}</> : '—'}</td><td className="px-5 py-5"><p>{entity.email || '—'}</p><p className="mt-1 text-ink/60">{entity.phone}</p></td></> : resource === 'categories' ? <td className="max-w-xs break-words px-5 py-5 text-ink/65">{entity.description || '—'}</td> : <>
+            {resource === 'guests' ? <><td className="px-5 py-5">{entity.document ? <>{entity.documentType ? `${entity.documentType}: ` : ''}{entity.document}{!entity.documentType && <span className="ml-2 text-xs text-orange">não classificado</span>}</> : '—'}</td><td className="max-w-64 break-words px-5 py-5 font-semibold text-forest">{entity.name}</td><td className="px-5 py-5"><p>{entity.email || '—'}</p><p className="mt-1 text-ink/60">{entity.phone}</p></td></> : <><td className="max-w-64 break-words px-5 py-5 font-semibold text-forest">{entity.name ?? entity.number}</td>{resource === 'categories' ? <td className="max-w-xs break-words px-5 py-5 text-ink/65">{entity.description || '—'}</td> : <>
               <td className="px-5 py-5">{entity.categoryName}</td><td className="px-5 py-5">{entity.capacity} pessoas</td><td className="whitespace-nowrap px-5 py-5">{Number(entity.dailyRate).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td><td className="px-5 py-5"><span className={`rounded-full px-3 py-1 text-xs font-semibold ${entity.isAvailable ? 'bg-forest/10 text-forest' : 'bg-orange/15 text-orange'}`}>{entity.isAvailable ? 'Disponível' : 'Indisponível'}</span></td>
-            </>}
+            </>}</>}
             <td className="px-3 py-4 text-right"><div className="flex flex-wrap justify-end gap-1">
               <button type="button" className={action} disabled={busy !== null} onClick={() => void open(entity, true)}>Detalhes</button>
               <button type="button" className={action} disabled={busy !== null} onClick={() => void open(entity, false)}>Editar</button>
