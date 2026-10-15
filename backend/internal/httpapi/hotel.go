@@ -78,11 +78,12 @@ func (a *api) writeCategoryResult(w http.ResponseWriter, category hotel.RoomCate
 }
 
 type guestRequest struct {
-	Name     string  `json:"name"`
-	Document *string `json:"document"`
-	Email    *string `json:"email"`
-	Phone    *string `json:"phone"`
-	Address  *string `json:"address"`
+	Name         string  `json:"name"`
+	DocumentType *string `json:"documentType"`
+	Document     *string `json:"document"`
+	Email        *string `json:"email"`
+	Phone        *string `json:"phone"`
+	Address      *string `json:"address"`
 }
 
 func (a *api) createGuest(w http.ResponseWriter, r *http.Request) {
@@ -93,7 +94,7 @@ func (a *api) createGuest(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &input) {
 		return
 	}
-	guest, err := a.hotel.CreateGuest(r.Context(), hotel.GuestInput{Name: input.Name, Document: input.Document, Email: input.Email, Phone: input.Phone, Address: input.Address})
+	guest, err := a.hotel.CreateGuest(r.Context(), hotel.GuestInput{Name: input.Name, DocumentType: input.DocumentType, Document: input.Document, Email: input.Email, Phone: input.Phone, Address: input.Address})
 	a.writeGuestResult(w, guest, err, http.StatusCreated)
 }
 

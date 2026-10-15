@@ -31,6 +31,10 @@ func NewRouter(db *pgxpool.Pool, cfg config.Config) http.Handler {
 	api := &api{auth: auth.NewService(auth.NewPostgresRepository(db), cfg.JWTSecret), hotel: hotel.NewService(hotel.NewPostgresRepository(db)), frontendOrigin: cfg.FrontendOrigin, isDevelopment: cfg.IsDevelopment()}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/health", healthHandler(db))
+	mux.HandleFunc("GET /api/v1/public/availability", api.publicAvailability)
+	mux.HandleFunc("POST /api/v1/public/reservations", api.createPublicReservation)
+	mux.HandleFunc("GET /api/v1/reservations/availability", api.staffAvailability)
+	mux.HandleFunc("POST /api/v1/reservations", api.createStaffReservation)
 	mux.HandleFunc("POST /api/v1/auth/login", api.login)
 	mux.HandleFunc("POST /api/v1/auth/refresh", api.refresh)
 	mux.HandleFunc("POST /api/v1/auth/logout", api.logout)

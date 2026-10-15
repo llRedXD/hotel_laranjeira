@@ -54,7 +54,7 @@ fields aparece quando há erros por campo.
 | GET /api/v1/auth/me | Bearer | user |
 | POST /api/v1/auth/password-recovery | email | 202, mensagem genérica |
 | POST /api/v1/auth/password-reset | token, password | 204 |
-| POST /api/v1/guests | name; document, email, phone, address opcionais | 201, guest |
+| POST /api/v1/guests | name; documentType, document, email, phone, address opcionais | 201, guest |
 | GET /api/v1/guests | search, limit, offset | guests |
 | GET /api/v1/guests/{id} | UUID | guest |
 | PATCH /api/v1/guests/{id} | campos a alterar | guest |
@@ -72,10 +72,30 @@ ocorrem em uma operação SQL, preservando as colunas não enviadas.
 
 Exemplo: `{"phone":null}` limpa somente o telefone de um hóspede;
 `{"name":"Suíte"}` renomeia a categoria preservando sua descrição.
-Strings são aparadas; e-mail é normalizado para minúsculas. Limites contam
-caracteres Unicode: nome de hóspede 120, categoria 80, documento/telefone 30,
-e-mail 255 e endereço/descrição 2000. Documento continua opcional, sem validação
-específica de CPF/passaporte.
+Strings são aparadas; e-mail é normalizado para minúsculas. O tipo do documento
+aceita RG ou CPF e pode permanecer nulo em cadastros antigos até classificação
+explícita. Limites contam caracteres Unicode: nome de hóspede 120, categoria 80,
+documento/telefone 30, e-mail 255 e endereço/descrição 2000. Documento continua
+opcional nos cadastros internos; a reserva pública exige tipo e número, sem
+validação formal de RG/CPF.
+
+### Reservas
+
+| Método e caminho | Acesso | Entrada | Saída |
+| --- | --- | --- | --- |
+| GET `/api/v1/public/availability` | público | `checkIn`, `checkOut` (`YYYY-MM-DD`), `occupants` | `rooms` com quarto, categoria, capacidade, diária, noites e total estimado |
+| POST `/api/v1/public/reservations` | público | `roomId`, datas, `occupants`, `expectedDailyRate`, `guest` (`name`, `documentType`, `document`, `email`) | 201, confirmação sem documento nem e-mail |
+| GET `/api/v1/reservations/availability` | Bearer JWT | mesmos filtros públicos | `rooms` com disponibilidade e preço estimado |
+| POST `/api/v1/reservations` | Bearer JWT | `roomId`, datas, `occupants`, `expectedDailyRate`, `guestId` | 201, reserva operacional |
+
+O intervalo é `[checkIn, checkOut)`: uma nova reserva pode começar no dia do
+checkout anterior. A API calcula o total em centavos inteiros, verifica
+capacidade, disponibilidade e diária novamente durante a confirmação; se a
+diária mudou desde a consulta, é preciso consultar novamente. A reserva persiste
+a diária/total aplicados. Conflito de quarto, preço ou duplicidade de hóspede retorna
+409; entrada inválida retorna 422. As rotas públicas não dão acesso às rotas
+administrativas de hóspedes/quartos e a resposta pública não revela o cadastro
+associado ao documento informado.
 
 ## Serviços e repositórios de hotel
 
@@ -104,10 +124,14 @@ Com PostgreSQL local ativo e credenciais de desenvolvimento:
 TEST_DATABASE_URL='postgres://hotel_laranjeira:hotel_laranjeira_dev@localhost:5432/hotel_laranjeira?sslmode=disable' CGO_ENABLED=0 go test ./internal/hotel -v -count=1
 ```
 
-O teste usa um esquema exclusivo, aplica a migração 003 em transação e faz
-rollback ao terminar. O usuário precisa de permissão CREATE SCHEMA.
-Sem TEST_DATABASE_URL, a integração é explicitamente pulada. Testes HTTP de
-presença de campos executam normalmente com `go test ./...`.
+Os testes de hotel usam esquema exclusivo, aplicam as migrações 003 e 005 e
+fazem rollback/limpeza ao terminar. O usuário precisa de permissão CREATE SCHEMA.
+Eles cobrem preservação de documentos legados, cálculo, conflito de período,
+checkout sucessivo e duas confirmações simultâneas. A migração versionada
+completa inclui também a versão 004 de autenticação.
+Sem TEST_DATABASE_URL, os testes PostgreSQL são explicitamente pulados. Testes
+de regras, contratos HTTP, autenticação e resposta pública executam com
+`go test ./...`.
 
 Para incluir autenticação, use a mesma variável e execute:
 `CGO_ENABLED=0 go test ./internal/auth ./internal/hotel -v -count=1`.
