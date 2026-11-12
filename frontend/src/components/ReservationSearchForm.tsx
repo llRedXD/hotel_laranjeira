@@ -4,13 +4,14 @@ type ReservationSearchValues = { checkIn: string, checkOut: string, occupants: n
 
 const control = 'w-full rounded-xl border border-forest/20 bg-white px-4 py-3 text-sm text-ink focus:border-orange focus:outline-none focus:ring-4 focus:ring-orange/15'
 
-export function ReservationSearchForm({ value, busy, onChange, onSubmit }: {
+export function ReservationSearchForm({ value, busy, onChange, onSubmit, minimumCheckIn }: {
   value: ReservationSearchValues
   busy: boolean
+  minimumCheckIn?: string
   onChange: (value: ReservationSearchValues) => void
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void
 }) {
-  const today = localDateString(new Date())
+  const today = minimumCheckIn ?? localDateString(new Date())
   const minimumCheckOut = value.checkIn ? addCalendarDays(value.checkIn, 1) : undefined
 
   return <form onSubmit={onSubmit} className="grid gap-4 rounded-2xl border border-forest/10 bg-cream p-5 shadow-sm sm:grid-cols-2 lg:grid-cols-4">

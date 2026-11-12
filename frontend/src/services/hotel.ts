@@ -18,7 +18,14 @@ export type Entity = {
   dailyRate?: string
   isAvailable?: boolean
 }
+export type ReservationStatus = 'confirmed' | 'in_progress' | 'departure_today' | 'ended' | 'cancelled'
 export type ReceptionReservation = {
+  roomId: string
+  guestId: string
+  status: ReservationStatus
+  version: number
+  canEdit: boolean
+  canCancel: boolean
   id: string
   checkIn: string
   checkOut: string
@@ -29,7 +36,17 @@ export type ReceptionReservation = {
   roomNumber: string
   categoryName: string
 }
-export type ReservationSummary = { guestsInHouse: number, checkInsToday: number, availableRooms: number }
+export type ReservationSummary = { date: string, guestsInHouse: number, checkInsToday: number, availableRooms: number }
+export type ReservationAuditState = {
+  status: ReservationStatus, roomId: string, roomNumber: string, checkIn: string, checkOut: string,
+  occupants: number, dailyRate: string, totalAmount: string, version: number,
+}
+export type ReservationEvent = {
+  id: string, reservationId: string, action: 'imported' | 'created' | 'cancelled' | 'updated',
+  source: 'import' | 'public' | 'staff' | 'database', actorId: string | null, actorName: string | null,
+  guestName: string, roomNumber: string, occurredAt: string,
+  beforeState: ReservationAuditState | null, afterState: ReservationAuditState,
+}
 const paths: Record<Resource, string> = { guests: '/guests', categories: '/room-categories', rooms: '/rooms' }
 export const pageSize = 20
 export async function listEntities(resource: Resource, query: URLSearchParams): Promise<Entity[]> {
@@ -56,8 +73,9 @@ export async function saveEntity(resource: Resource, id: string | undefined, val
 export async function changeAvailability(id: string, available: boolean) {
   await authenticatedRequest(`/rooms/${id}/availability`, { method: 'PATCH', body: JSON.stringify({ isAvailable: available }) })
 }
-export async function searchReservationAvailability(input: { checkIn: string, checkOut: string, occupants: number }) {
+export async function searchReservationAvailability(input: { checkIn: string, checkOut: string, occupants: number, reservationId?: string }) {
   const query = new URLSearchParams({ checkIn: input.checkIn, checkOut: input.checkOut, occupants: String(input.occupants) })
+  if (input.reservationId) query.set('reservationId', input.reservationId)
   const result = await authenticatedRequest<{ rooms: AvailabilityOption[] }>(`/reservations/availability?${query}`)
   return result.rooms
 }
@@ -70,10 +88,28 @@ export async function createStaffReservation(input: StaffReservationInput) {
 export async function listReservations(query: URLSearchParams) {
   return authenticatedRequest<{ reservations: ReceptionReservation[], total: number }>(`/reservations?${query}`)
 }
-export async function getReservationSummary(date: string) {
-  const query = new URLSearchParams({ date })
+export async function getReservationSummary(date?: string) {
+  const query = new URLSearchParams(date ? { date } : {})
   const result = await authenticatedRequest<{ summary: ReservationSummary }>(`/reservations/summary?${query}`)
   return result.summary
+}
+export async function cancelReservation(id: string, version: number) {
+  return authenticatedRequest<{ reservation: ReceptionReservation }>(`/reservations/${encodeURIComponent(id)}/cancel`, {
+    method: 'POST', body: JSON.stringify({ version }),
+  })
+}
+export async function getReservation(id: string) {
+  return authenticatedRequest<{ reservation: ReceptionReservation, hotelDate: string }>(`/reservations/${encodeURIComponent(id)}`)
+}
+export async function updateReservation(id: string, input: {
+  roomId: string, checkIn: string, checkOut: string, occupants: number, expectedDailyRate: string, version: number,
+}) {
+  return authenticatedRequest<{ reservation: ReceptionReservation }>(`/reservations/${encodeURIComponent(id)}`, {
+    method: 'PATCH', body: JSON.stringify(input),
+  })
+}
+export async function listReservationEvents(query: URLSearchParams) {
+  return authenticatedRequest<{ events: ReservationEvent[], total: number }>(`/reservation-events?${query}`)
 }
 export async function allCategories(): Promise<Entity[]> {
   return listAll('categories')

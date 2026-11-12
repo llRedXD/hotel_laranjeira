@@ -5,6 +5,7 @@ import { useAuth } from '../hooks/useAuth'
 const menuItems = [
   { label: 'Visão geral', to: '/painel', icon: '⌂' },
   { label: 'Reservas', to: '/reservas', icon: '▣' },
+  { label: 'Auditoria', to: '/auditoria', icon: '≡' },
   { label: 'Hóspedes', to: '/hospedes', icon: '♙' },
   { label: 'Quartos', to: '/quartos', icon: '▤' },
   { label: 'Categorias', to: '/categorias', icon: '▦' },

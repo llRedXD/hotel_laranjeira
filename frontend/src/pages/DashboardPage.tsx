@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { getReservationSummary, listReservations, type ReceptionReservation, type ReservationSummary } from '../services/hotel'
-import { formatBRL, formatReservationDate, localDateString } from '../services/reservations'
+import { formatBRL, formatReservationDate } from '../services/reservations'
 
 const shortcuts = [
   { title: 'Hóspedes', description: 'Consulte e atualize cadastros.', to: '/hospedes' },
@@ -10,12 +10,8 @@ const shortcuts = [
   { title: 'Categorias', description: 'Organize os tipos de acomodação.', to: '/categorias' },
 ]
 
-function localToday() {
-  return localDateString(new Date())
-}
-
 function greeting() {
-  const hour = new Date().getHours()
+  const hour = Number(new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', hourCycle: 'h23' }).format(new Date()))
   if (hour < 12) return 'Bom dia'
   if (hour < 18) return 'Boa tarde'
   return 'Boa noite'
@@ -37,12 +33,12 @@ export function DashboardPage() {
       const query = new URLSearchParams({ limit: '5', offset: '0' })
       try {
         const [dailySummary, reservationPage] = await Promise.all([
-          getReservationSummary(localToday()),
+          getReservationSummary(),
           listReservations(query),
         ])
         if (active) {
           setSummary(dailySummary)
-          setReservations(reservationPage.reservations.filter(reservation => reservation.checkOut > localToday()).slice(0, 5))
+          setReservations(reservationPage.reservations.filter(reservation => reservation.status === 'in_progress' || reservation.status === 'confirmed').slice(0, 5))
         }
       } catch (cause) {
         if (active) setError(cause instanceof Error ? cause.message : 'Não foi possível carregar o painel.')
@@ -55,8 +51,8 @@ export function DashboardPage() {
   }, [revision])
 
   const metrics = [
-    { label: 'Hóspedes hospedados esta noite', value: summary?.guestsInHouse ?? 0, detail: 'reservas que incluem esta noite', accent: 'bg-orange/15 text-orange' },
-    { label: 'Check-ins hoje', value: summary?.checkInsToday ?? 0, detail: 'chegadas previstas para hoje', accent: 'bg-forest/10 text-forest' },
+    { label: 'Hóspedes previstos esta noite', value: summary?.guestsInHouse ?? 0, detail: 'reservas que incluem esta noite', accent: 'bg-orange/15 text-orange' },
+    { label: 'Entradas previstas hoje', value: summary?.checkInsToday ?? 0, detail: 'chegadas previstas para hoje', accent: 'bg-forest/10 text-forest' },
     { label: 'Quartos livres esta noite', value: summary?.availableRooms ?? 0, detail: 'considerando as reservas confirmadas', accent: 'bg-moss/15 text-moss' },
   ]
 
@@ -68,7 +64,7 @@ export function DashboardPage() {
         <p className="mt-2 text-ink/65">A operação de hoje, em um só lugar.</p>
       </div>
       <div className="flex flex-wrap items-center gap-3">
-        <p className="rounded-full bg-cream px-4 py-2 text-sm font-medium text-ink/65 shadow-sm">{new Intl.DateTimeFormat('pt-BR', { dateStyle: 'long' }).format(new Date())}</p>
+        <p className="rounded-full bg-cream px-4 py-2 text-sm font-medium text-ink/65 shadow-sm">{summary ? formatReservationDate(summary.date) : 'Consultando data do hotel…'}</p>
         <Link to="/reservas/nova" className="rounded-xl bg-forest px-5 py-3 text-sm font-semibold text-cream transition-colors hover:bg-moss focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange">+ Nova reserva</Link>
       </div>
     </header>
