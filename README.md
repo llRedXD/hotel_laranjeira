@@ -65,10 +65,12 @@ Para acessar o sistema na avaliação, consulte os
 
 ## Estado atual
 
-- Autenticação e painel React; métricas do painel são demonstrativas.
+- Autenticação e painel React com indicadores calculados pelas reservas não canceladas.
 - API de hóspedes e categorias com cadastro, consulta e edição.
 - API e telas operacionais de hóspedes, categorias e quartos.
 - Reservas públicas e da recepção, com cálculo de diárias, total previsto e proteção contra conflitos.
+- Consulta de reservas com status previstos, filtro por noites ocupadas e histórico individual pelo cadastro do hóspede.
+- Alteração e cancelamento de reservas futuras, com revisão de valores e auditoria de responsável, horário e estado anterior/posterior.
 - Pagamentos e registro do check-in/check-out realizado continuam fora desta entrega.
 
 ## API sem Docker
@@ -106,5 +108,5 @@ serviço de e-mail e publicação dos arquivos compilados do front-end.
 
 ## Próximos passos
 
-1. Ampliar a gestão de reservas com cancelamento e histórico, conforme decisões futuras.
+1. Registrar o aceite final da gestão de reservas; a verificação técnica está documentada em [Validação final](docs/VALIDACAO_FINAL_RESERVAS.md).
 2. Avaliar pagamentos e registro do check-in/check-out realizado em entregas separadas.

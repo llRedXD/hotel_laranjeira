@@ -85,10 +85,94 @@ validação formal de RG/CPF.
 | --- | --- | --- | --- |
 | GET `/api/v1/public/availability` | público | `checkIn`, `checkOut` (`YYYY-MM-DD`), `occupants` | `rooms` com quarto, categoria, capacidade, diária, noites e total estimado |
 | POST `/api/v1/public/reservations` | público | `roomId`, datas, `occupants`, `expectedDailyRate`, `guest` (`name`, `documentType`, `document`, `email`) | 201, confirmação sem documento nem e-mail |
-| GET `/api/v1/reservations/availability` | Bearer JWT | mesmos filtros públicos | `rooms` com disponibilidade e preço estimado |
-| GET `/api/v1/reservations` | Bearer JWT | `search`, `from`, `to`, `limit`, `offset` opcionais | `reservations` paginadas e `total`; busca por hóspede, documento ou quarto; `from`/`to` filtram a data de entrada |
-| GET `/api/v1/reservations/summary` | Bearer JWT | `date` (`YYYY-MM-DD`) | `summary` com hóspedes no hotel, check-ins e quartos livres na data |
+| GET `/api/v1/reservations/availability` | Bearer JWT | mesmos filtros públicos e `reservationId` opcional para edição | `rooms` com disponibilidade e preço estimado, desconsiderando a própria reserva na edição |
+| GET `/api/v1/reservations` | Bearer JWT | `guestId`, `search`, `from`, `to`, `limit`, `offset` opcionais | `reservations` paginadas e `total`; busca por hóspede, documento ou quarto; histórico exato por `guestId`; `from`/`to` filtram noites ocupadas |
+| GET `/api/v1/reservations/summary` | Bearer JWT | `date` (`YYYY-MM-DD`) opcional | `summary` com `date`, hóspedes previstos, entradas previstas e quartos livres na data |
 | POST `/api/v1/reservations` | Bearer JWT | `roomId`, datas, `occupants`, `expectedDailyRate`, `guestId` | 201, reserva operacional |
+| POST `/api/v1/reservations/{id}/cancel` | Bearer JWT | `version` positiva | 200, `reservation` cancelada, versão incrementada e permissões atualizadas |
+| GET `/api/v1/reservations/{id}` | Bearer JWT | UUID | `reservation` operacional e `hotelDate` em `YYYY-MM-DD` |
+| PATCH `/api/v1/reservations/{id}` | Bearer JWT | `roomId`, `checkIn`, `checkOut`, `occupants`, `expectedDailyRate`, `version` | 200, `reservation` atualizada |
+| GET `/api/v1/reservation-events` | Bearer JWT | `reservationId`, `search`, `limit`, `offset` opcionais | `events` paginados, mais recentes primeiro, e `total` |
+
+A listagem inclui `status`, calculado no backend pela data de
+`America/Sao_Paulo`: `confirmed` (Confirmada), `in_progress` (Estadia prevista
+em andamento), `departure_today` (Saída prevista hoje), `ended` (Encerrada pelo
+período) ou `cancelled` (Cancelada). Cancelamento tem prioridade sobre as datas.
+Esses estados não comprovam check-in ou checkout realizados. Canceladas continuam
+na listagem, mas não bloqueiam quartos nem entram nos indicadores.
+No resumo, `date` pode ser omitido para consultar a data atual do hotel;
+quando informado, continua representando a data de referência do relatório.
+
+Cada item da listagem inclui `guestId`, `version`, `canEdit` e `canCancel`.
+As permissões são verdadeiras somente para reservas não canceladas com entrada
+posterior à data atual do hotel.
+`guestId` deve ser um UUID válido; combinado com os
+demais filtros, limita os resultados ao hóspede indicado, mesmo após renomeação.
+Sem correspondências, retorna lista vazia e `total=0`.
+
+`from`/`to` representam um intervalo inclusivo de noites: `check_out > from`
+e `check_in <= to`. Ambos são opcionais e podem ser usados isoladamente;
+intervalos invertidos retornam 422. Uma estadia iniciada antes do intervalo é
+incluída se ainda ocupar alguma noite dele. Canceladas são filtradas pelas datas
+reservadas e permanecem no histórico. A tela de hóspedes oferece acesso ao
+histórico, e a tela de reservas preserva `guestId` ao paginar ou aplicar filtros.
+
+### Cancelamento e auditoria
+
+Administrador e recepção podem cancelar uma reserva futura. O servidor obtém o
+funcionário pelo token, exige a versão consultada e revalida as datas depois de
+obter os bloqueios do quarto e da reserva. A partir do dia da entrada (São Paulo),
+o cancelamento é bloqueado. Inexistente retorna 404; versão/estado incompatível,
+409; UUID/versão inválidos, 422. Não há reativação nem exclusão da reserva.
+
+A migração 007 registra uma base inicial das reservas existentes (`imported`),
+sem inventar eventos passados. Um trigger grava criação, cancelamento e alteração
+na mesma transação da reserva. Falha no evento desfaz a operação. Não existem
+endpoints para editar ou excluir eventos. A rotina de demonstração apaga
+explicitamente esses eventos antes de recriar as reservas.
+
+Cada evento contém `action`, `source`, `actorId`, `actorName`, `occurredAt`,
+`reservationId`, `guestName`, `roomNumber`, `beforeState` e `afterState`.
+Os estados guardam status, quarto, datas, ocupantes, diária, total e versão, sem
+documento/e-mail do hóspede. Nome do autor e dados operacionais são snapshots.
+Origens: `staff` (token autenticado), `public` (reserva pelo site), `database`
+(escrita direta) ou `import` (base inicial). Criação pública não recebe um autor
+funcionário. Os endpoints autenticados nunca aceitam um autor enviado pelo cliente.
+
+O filtro `search` busca nome, quarto ou referência da reserva; `reservationId`
+é um UUID exato. A tela `/auditoria` oferece consulta global ou por reserva,
+busca, paginação e comparação antes/depois. Horários são exibidos em São Paulo.
+Mudanças automáticas de status pela passagem das datas não geram eventos.
+A edição preenche o contexto transacional `hotel.actor_id` e
+`hotel.event_source='staff'` para preservar a autoria.
+
+### Alteração de reservas
+
+Administrador e recepção podem alterar somente quarto, datas e ocupantes, com
+o conjunto completo desses campos, a diária revisada e a versão atual no PATCH.
+Hóspede e snapshots de nome/documento/e-mail permanecem intactos; campos como
+`guestId` ou `actorId` no JSON são recusados. A entrada atual e a nova entrada
+devem ser posteriores à data do hotel. Canceladas e estadias iniciadas não podem
+ser alteradas. UUID/versão/campos inválidos retornam 422; inexistente, 404;
+estado, versão, disponibilidade ou preço desatualizados, 409.
+
+Na consulta autenticada de disponibilidade, `reservationId` desconsidera somente
+a própria reserva e aplica sua diária contratada ao quarto atual. Para outro
+quarto, apresenta a diária atual do cadastro. A rota pública não utiliza esse
+parâmetro. A gravação repete a validação de capacidade, quarto habilitado,
+disponibilidade, diária e versão. Os quartos envolvidos são bloqueados em ordem
+de UUID antes da reserva, preservando a proteção contra sobreposição sob
+concorrência com criação, cancelamento e outras edições.
+
+O servidor recalcula o total em centavos e incrementa a versão em alterações
+efetivas. Uma requisição sem mudanças retorna os dados sem incrementar a versão
+nem gerar evento. A atualização e a auditoria são atômicas. A tela
+`/reservas/{id}/editar` usa três etapas: escolher datas/pessoas/quarto, ajustar e
+revisar o antes/depois. Cada escolha exibe somente os campos correspondentes;
+datas/pessoas mantêm o quarto atual e só incluem uma troca com escolha explícita.
+A confirmação final grava a alteração. Voltar ao ajuste invalida a cotação;
+trocar o tipo de alteração reinicia o rascunho. Em conflito, oferece recarregar
+a reserva; isso descarta a proposta e exige nova revisão.
 
 O intervalo é `[checkIn, checkOut)`: uma nova reserva pode começar no dia do
 checkout anterior. A API calcula o total em centavos inteiros, verifica
@@ -126,11 +210,14 @@ Com PostgreSQL local ativo e credenciais de desenvolvimento:
 TEST_DATABASE_URL='postgres://hotel_laranjeira:hotel_laranjeira_dev@localhost:5432/hotel_laranjeira?sslmode=disable' CGO_ENABLED=0 go test ./internal/hotel -v -count=1
 ```
 
-Os testes de hotel usam esquema exclusivo, aplicam as migrações 003 e 005 e
+Os testes de reservas usam esquema exclusivo, aplicam as migrações 001, 003, 005, 006 e 007 e
 fazem rollback/limpeza ao terminar. O usuário precisa de permissão CREATE SCHEMA.
 Eles cobrem preservação de documentos legados, cálculo, conflito de período,
 checkout sucessivo e duas confirmações simultâneas. A migração versionada
 completa inclui também a versão 004 de autenticação.
+Também cobrem evolução de uma reserva existente para a migração 006,
+preservação de snapshots, metadados de cancelamento, liberação/reutilização
+de quarto e exclusão de canceladas dos indicadores.
 Sem TEST_DATABASE_URL, os testes PostgreSQL são explicitamente pulados. Testes
 de regras, contratos HTTP, autenticação e resposta pública executam com
 `go test ./...`.
