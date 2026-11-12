@@ -28,6 +28,16 @@ export function ReceptionReservationsPage() {
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
 
+  function handleSearchValuesChange(next: typeof dates) {
+    if (next.checkIn === dates.checkIn && next.checkOut === dates.checkOut && next.occupants === dates.occupants) return
+    setDates(next)
+    setRooms([])
+    setSelectedRoom(null)
+    setSearched(false)
+    setSuccess('')
+    setError('')
+  }
+
   async function handleGuestSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setLoadingGuests(true)
@@ -121,7 +131,7 @@ export function ReceptionReservationsPage() {
 
     <section className="mt-7 rounded-2xl border border-forest/10 bg-cream p-5 shadow-sm sm:p-7">
       <h2 className="mb-4 font-serif text-2xl font-semibold text-forest">2. Período e acomodação</h2>
-      <ReservationSearchForm value={dates} busy={busy} onChange={setDates} onSubmit={handleAvailability} />
+      <ReservationSearchForm value={dates} busy={busy} onChange={handleSearchValuesChange} onSubmit={handleAvailability} />
       {searched && <div className="mt-7"><ReservationRoomOptions rooms={rooms} selectedRoomId={selectedRoom?.roomId} onSelect={setSelectedRoom} /></div>}
       {selectedRoom && selectedGuest && <div className="mt-6 flex flex-col gap-4 rounded-xl border border-forest/10 bg-white p-5 sm:flex-row sm:items-center sm:justify-between">
         <div><p className="font-semibold text-forest">Quarto {selectedRoom.number} · {selectedRoom.categoryName}</p><p className="mt-1 text-sm text-ink/65">{selectedRoom.nights} diárias × {formatBRL(selectedRoom.dailyRate)} · {dates.occupants} pessoa(s)</p><p className="mt-1 text-sm font-semibold text-forest">Total previsto: {formatBRL(selectedRoom.estimatedTotal)}</p><p className="mt-1 text-xs text-ink/60">Hóspede: {selectedGuest.name}</p></div>
