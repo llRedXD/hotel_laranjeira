@@ -5,6 +5,7 @@ import { useAuth } from '../hooks/useAuth'
 const menuItems = [
   { label: 'Visão geral', to: '/painel', icon: '⌂' },
   { label: 'Reservas', to: '/reservas', icon: '▣' },
+  { label: 'Auditoria', to: '/auditoria', icon: '≡' },
   { label: 'Hóspedes', to: '/hospedes', icon: '♙' },
   { label: 'Quartos', to: '/quartos', icon: '▤' },
   { label: 'Categorias', to: '/categorias', icon: '▦' },
@@ -27,6 +28,7 @@ export function DashboardLayout() {
 
   return (
     <div className="min-h-screen bg-sand lg:flex">
+      <a href="#dashboard-main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-forest focus:px-4 focus:py-3 focus:text-cream focus:outline-none focus:ring-4 focus:ring-orange/50">Pular para o conteúdo principal</a>
       <aside className="bg-forest px-5 py-5 text-cream lg:flex lg:w-72 lg:flex-col lg:px-6 lg:py-8">
         {logoutError && <p role="alert">{logoutError}</p>}
         <div className="flex items-center justify-between lg:block">
@@ -64,7 +66,7 @@ export function DashboardLayout() {
           <button className="mt-5 w-full rounded-xl border border-cream/25 px-4 py-2.5 text-sm font-semibold transition hover:bg-cream/10" type="button" onClick={handleLogout}>Sair da conta</button>
         </div>
       </aside>
-      <main className="min-w-0 flex-1"><Outlet /></main>
+      <main id="dashboard-main" tabIndex={-1} className="min-w-0 flex-1"><Outlet /></main>
     </div>
   )
 }

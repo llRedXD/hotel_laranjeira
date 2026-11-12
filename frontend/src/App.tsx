@@ -10,6 +10,9 @@ import { PasswordResetPage } from './pages/PasswordResetPage'
 import { RecordsPage } from './pages/RecordsPage'
 import { ReservationPage } from './pages/ReservationPage'
 import { ReceptionReservationsPage } from './pages/ReceptionReservationsPage'
+import { ReservationsListPage } from './pages/ReservationsListPage'
+import { ReservationAuditPage } from './pages/ReservationAuditPage'
+import { ReservationEditPage } from './pages/ReservationEditPage'
 
 export default function App() {
   return (
@@ -27,10 +30,13 @@ export default function App() {
       <Route element={<ProtectedRoute />}>
         <Route element={<DashboardLayout />}>
           <Route path="/painel" element={<DashboardPage />} />
+          <Route path="/reservas/nova" element={<ReceptionReservationsPage />} />
           <Route path="/hospedes" element={<RecordsPage key="guests" resource="guests" />} />
           <Route path="/categorias" element={<RecordsPage key="categories" resource="categories" />} />
           <Route path="/quartos" element={<RecordsPage key="rooms" resource="rooms" />} />
-          <Route path="/reservas" element={<ReceptionReservationsPage />} />
+          <Route path="/reservas" element={<ReservationsListPage />} />
+          <Route path="/auditoria" element={<ReservationAuditPage />} />
+          <Route path="/reservas/:id/editar" element={<ReservationEditPage />} />
         </Route>
       </Route>
     </Routes>

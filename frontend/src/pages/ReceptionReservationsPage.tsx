@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { EntityDialog } from '../components/EntityDialog'
 import { ReservationRoomOptions } from '../components/ReservationRoomOptions'
 import { ReservationSearchForm } from '../components/ReservationSearchForm'
@@ -11,7 +12,7 @@ const today = localDateString(todayDate)
 const tomorrowDate = new Date(todayDate)
 tomorrowDate.setDate(tomorrowDate.getDate() + 1)
 const tomorrow = localDateString(tomorrowDate)
-const control = 'w-full rounded-xl border border-forest/20 bg-white px-4 py-3 text-sm focus:border-orange focus:outline-none focus:ring-4 focus:ring-orange/15'
+const control = 'w-full rounded-xl border border-forest/20 bg-white px-4 py-3 text-sm focus-visible:border-orange focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-orange/15'
 
 export function ReceptionReservationsPage() {
   const [guestSearch, setGuestSearch] = useState('')
@@ -26,6 +27,16 @@ export function ReceptionReservationsPage() {
   const [searched, setSearched] = useState(false)
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
+
+  function handleSearchValuesChange(next: typeof dates) {
+    if (next.checkIn === dates.checkIn && next.checkOut === dates.checkOut && next.occupants === dates.occupants) return
+    setDates(next)
+    setRooms([])
+    setSelectedRoom(null)
+    setSearched(false)
+    setSuccess('')
+    setError('')
+  }
 
   async function handleGuestSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -95,33 +106,36 @@ export function ReceptionReservationsPage() {
   }
 
   return <div className="mx-auto max-w-6xl px-5 py-8 sm:px-8 sm:py-10">
-    <header className="mb-8">
-      <p className="text-sm font-semibold tracking-[0.18em] text-orange uppercase">Atendimento</p>
-      <h1 className="mt-2 font-serif text-4xl font-semibold text-forest">Nova reserva</h1>
-      <p className="mt-2 text-ink/65">Selecione o hóspede, consulte o período e confirme a acomodação.</p>
+    <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <p className="text-sm font-semibold tracking-[0.18em] text-orange uppercase">Atendimento</p>
+        <h1 className="mt-2 font-serif text-4xl font-semibold text-forest">Nova reserva</h1>
+        <p className="mt-2 text-ink/65">Selecione o hóspede, consulte o período e confirme a acomodação.</p>
+      </div>
+      <Link to="/reservas" className="rounded-xl border border-forest/20 bg-cream px-5 py-3 text-sm font-semibold text-forest transition-colors hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange">Ver reservas</Link>
     </header>
 
     <section className="rounded-2xl border border-forest/10 bg-cream p-5 shadow-sm sm:p-7">
       <h2 className="font-serif text-2xl font-semibold text-forest">1. Selecionar hóspede</h2>
       <form onSubmit={handleGuestSearch} className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
-        <div className="flex-1"><label htmlFor="guest-search" className="mb-1.5 block text-sm font-medium">Documento do hóspede (CPF ou RG)</label><input id="guest-search" type="search" autoComplete="off" className={control} placeholder="Digite o CPF ou RG; também é possível buscar pelo nome" value={guestSearch} onChange={event => setGuestSearch(event.target.value)} /><p className="mt-1.5 text-xs text-ink/60">Os documentos correspondentes aparecem primeiro. Se não souber o documento, busque pelo nome.</p></div>
-        <button disabled={loadingGuests} className="rounded-xl border border-forest px-5 py-3 text-sm font-semibold text-forest disabled:opacity-60" type="submit">{loadingGuests ? 'Buscando...' : 'Buscar hóspedes'}</button>
+        <div className="flex-1"><label htmlFor="guest-search" className="mb-1.5 block text-sm font-medium">Documento do hóspede (CPF ou RG)</label><input id="guest-search" name="guestSearch" type="search" autoComplete="off" className={control} placeholder="Digite CPF/RG ou nome…" value={guestSearch} onChange={event => setGuestSearch(event.target.value)} /><p className="mt-1.5 text-xs text-ink/60">Os documentos correspondentes aparecem primeiro. Se não souber o documento, busque pelo nome.</p></div>
+        <button disabled={loadingGuests} className="rounded-xl border border-forest px-5 py-3 text-sm font-semibold text-forest transition-colors hover:bg-forest/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange disabled:opacity-60" type="submit">{loadingGuests ? 'Buscando…' : 'Buscar hóspedes'}</button>
       </form>
-      {guests.length > 0 && <div className="mt-4"><label htmlFor="guest-select" className="mb-1.5 block text-sm font-medium">Resultados</label><select id="guest-select" className={control} value={selectedGuest?.id ?? ''} onChange={event => setSelectedGuest(guests.find(guest => guest.id === event.target.value) ?? null)}><option value="">Selecione um hóspede</option>{guests.map(guest => <option key={guest.id} value={guest.id}>{guest.documentType ?? 'Documento'} {guest.document ?? 'ausente'} · {guest.name} · {guest.email ?? 'sem e-mail'}</option>)}</select></div>}
+      {guests.length > 0 && <div className="mt-4"><label htmlFor="guest-select" className="mb-1.5 block text-sm font-medium">Resultados</label><select id="guest-select" name="guestId" className={control} value={selectedGuest?.id ?? ''} onChange={event => setSelectedGuest(guests.find(guest => guest.id === event.target.value) ?? null)}><option value="">Selecione um hóspede</option>{guests.map(guest => <option key={guest.id} value={guest.id}>{guest.documentType ?? 'Documento'} {guest.document ?? 'ausente'} · {guest.name} · {guest.email ?? 'sem e-mail'}</option>)}</select></div>}
       {selectedGuest && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-white p-4">
         <div><p className="font-semibold text-forest">{selectedGuest.documentType ?? 'Documento'} · {selectedGuest.document ?? 'ausente'}</p><p className="mt-1 text-sm text-ink/65">{selectedGuest.name} · {selectedGuest.email ?? 'E-mail ausente'}</p></div>
-        <button type="button" className="rounded-lg px-3 py-2 text-sm font-semibold text-orange underline" onClick={() => setEditGuest(true)}>Completar cadastro</button>
+        <button type="button" className="rounded-lg px-3 py-2 text-sm font-semibold text-orange underline hover:text-forest focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange" onClick={() => setEditGuest(true)}>Completar cadastro</button>
       </div>}
       {guests.length === 0 && !loadingGuests && <p className="mt-4 text-sm text-ink/60">Busque para selecionar um hóspede cadastrado.</p>}
     </section>
 
     <section className="mt-7 rounded-2xl border border-forest/10 bg-cream p-5 shadow-sm sm:p-7">
       <h2 className="mb-4 font-serif text-2xl font-semibold text-forest">2. Período e acomodação</h2>
-      <ReservationSearchForm value={dates} busy={busy} onChange={setDates} onSubmit={handleAvailability} />
+      <ReservationSearchForm value={dates} busy={busy} onChange={handleSearchValuesChange} onSubmit={handleAvailability} />
       {searched && <div className="mt-7"><ReservationRoomOptions rooms={rooms} selectedRoomId={selectedRoom?.roomId} onSelect={setSelectedRoom} /></div>}
       {selectedRoom && selectedGuest && <div className="mt-6 flex flex-col gap-4 rounded-xl border border-forest/10 bg-white p-5 sm:flex-row sm:items-center sm:justify-between">
         <div><p className="font-semibold text-forest">Quarto {selectedRoom.number} · {selectedRoom.categoryName}</p><p className="mt-1 text-sm text-ink/65">{selectedRoom.nights} diárias × {formatBRL(selectedRoom.dailyRate)} · {dates.occupants} pessoa(s)</p><p className="mt-1 text-sm font-semibold text-forest">Total previsto: {formatBRL(selectedRoom.estimatedTotal)}</p><p className="mt-1 text-xs text-ink/60">Hóspede: {selectedGuest.name}</p></div>
-        <button type="button" disabled={busy} onClick={() => void handleConfirm()} className="rounded-xl bg-forest px-6 py-3 text-sm font-semibold text-cream hover:bg-moss disabled:opacity-60">{busy ? 'Confirmando...' : 'Confirmar reserva'}</button>
+        <button type="button" disabled={busy} onClick={() => void handleConfirm()} className="rounded-xl bg-forest px-6 py-3 text-sm font-semibold text-cream transition-colors hover:bg-moss focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange disabled:opacity-60">{busy ? 'Confirmando…' : 'Confirmar reserva'}</button>
       </div>}
     </section>
     {error && <p role="alert" className="mt-5 rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}</p>}

@@ -26,6 +26,10 @@ type reservationRequest struct {
 }
 
 type reservationDateResponse struct {
+	Version      int    `json:"version,omitempty"`
+	CanEdit      *bool  `json:"canEdit,omitempty"`
+	CanCancel    *bool  `json:"canCancel,omitempty"`
+	Status       string `json:"status,omitempty"`
 	ID           string `json:"id"`
 	GuestID      string `json:"guestId,omitempty"`
 	RoomID       string `json:"roomId"`
@@ -38,6 +42,8 @@ type reservationDateResponse struct {
 	DocumentType string `json:"documentType,omitempty"`
 	Document     string `json:"document,omitempty"`
 	ContactEmail string `json:"contactEmail,omitempty"`
+	RoomNumber   string `json:"roomNumber,omitempty"`
+	CategoryName string `json:"categoryName,omitempty"`
 }
 
 func (a *api) publicAvailability(w http.ResponseWriter, r *http.Request) {
@@ -62,11 +68,74 @@ func (a *api) staffAvailability(w http.ResponseWriter, r *http.Request) {
 		writeValidationError(w, map[string]string{"filters": "Informe um período e uma quantidade válidos."})
 		return
 	}
-	rooms, err := a.hotel.ListAvailability(r.Context(), hotel.AvailabilityQuery{CheckIn: query.CheckIn, CheckOut: query.CheckOut, Occupants: query.Occupants})
+	rooms, err := a.hotel.ListAvailability(r.Context(), hotel.AvailabilityQuery{ReservationID: r.URL.Query().Get("reservationId"), CheckIn: query.CheckIn, CheckOut: query.CheckOut, Occupants: query.Occupants})
 	if writeReservationError(w, err) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"rooms": rooms})
+}
+
+func (a *api) listReservations(w http.ResponseWriter, r *http.Request) {
+	if !a.requireAuth(w, r) {
+		return
+	}
+	limit, offset, ok := pagination(w, r)
+	if !ok {
+		return
+	}
+	search := r.URL.Query().Get("search")
+	if len(search) > 255 {
+		writeValidationError(w, map[string]string{"search": "Busca excede 255 bytes."})
+		return
+	}
+	from, err := parseOptionalDate(r.URL.Query().Get("from"))
+	if err != nil {
+		writeValidationError(w, map[string]string{"from": "Use uma data válida no formato AAAA-MM-DD."})
+		return
+	}
+	to, err := parseOptionalDate(r.URL.Query().Get("to"))
+	if err != nil {
+		writeValidationError(w, map[string]string{"to": "Use uma data válida no formato AAAA-MM-DD."})
+		return
+	}
+	reservations, total, err := a.hotel.ListReservations(r.Context(), hotel.ReservationQuery{
+		GuestID: r.URL.Query().Get("guestId"),
+		Search:  search, From: from, To: to, Limit: limit, Offset: offset,
+	})
+	if writeReservationError(w, err) {
+		return
+	}
+	items := make([]reservationDateResponse, 0, len(reservations))
+	for _, reservation := range reservations {
+		items = append(items, staffReservationResponse(reservation))
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"reservations": items, "total": total})
+}
+
+func (a *api) reservationSummary(w http.ResponseWriter, r *http.Request) {
+	if !a.requireAuth(w, r) {
+		return
+	}
+	date, err := parseOptionalDate(r.URL.Query().Get("date"))
+	if err != nil {
+		writeValidationError(w, map[string]string{"date": "Informe uma data no formato AAAA-MM-DD."})
+		return
+	}
+	if date.IsZero() {
+		date = hotel.HotelDate(time.Now())
+	}
+	summary, err := a.hotel.ReservationSummary(r.Context(), date)
+	if writeReservationError(w, err) {
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"summary": summary})
+}
+
+func parseOptionalDate(value string) (time.Time, error) {
+	if value == "" {
+		return time.Time{}, nil
+	}
+	return time.Parse("2006-01-02", value)
 }
 
 func (a *api) createPublicReservation(w http.ResponseWriter, r *http.Request) {
@@ -92,7 +161,8 @@ func (a *api) createPublicReservation(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *api) createStaffReservation(w http.ResponseWriter, r *http.Request) {
-	if !a.requireAuth(w, r) {
+	user, ok := a.requireUser(w, r)
+	if !ok {
 		return
 	}
 	var request reservationRequest
@@ -104,7 +174,7 @@ func (a *api) createStaffReservation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	reservation, err := a.hotel.CreateReservation(r.Context(), hotel.ReservationInput{
-		RoomID: request.RoomID, GuestID: request.GuestID, CheckIn: checkIn, CheckOut: checkOut, Occupants: request.Occupants, ExpectedDailyRate: request.ExpectedDailyRate,
+		ActorID: user.ID, RoomID: request.RoomID, GuestID: request.GuestID, CheckIn: checkIn, CheckOut: checkOut, Occupants: request.Occupants, ExpectedDailyRate: request.ExpectedDailyRate,
 	})
 	if writeReservationError(w, err) {
 		return
@@ -141,6 +211,10 @@ func parseReservationDates(w http.ResponseWriter, checkInValue, checkOutValue st
 func writeReservationError(w http.ResponseWriter, err error) bool {
 	if err == nil {
 		return false
+	}
+	if errors.Is(err, hotel.ErrReservationState) {
+		writeError(w, http.StatusConflict, "reservation_state", "A reserva foi alterada ou não permite esta operação. Atualize a consulta.", nil)
+		return true
 	}
 	var validation *hotel.ValidationError
 	if errors.As(err, &validation) {

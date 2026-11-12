@@ -26,12 +26,24 @@ consulte a adoção de histórico em [DOCKER.md](../docs/DOCKER.md).
 | 003 | hóspedes, categorias e quartos |
 | 004 | versão de autenticação para revogação após troca de senha |
 | 005 | tipo e normalização de documento; reservas, snapshots e índices por quarto/período |
+| 006 | metadados de cancelamento e versão de reservas; preserva reservas existentes |
+| 007 | eventos de auditoria, registro inicial das reservas existentes e captura transacional de criação/alteração/cancelamento |
+
+A versão da reserva começa em 1. Cancelamento exige data e funcionário
+responsável juntos, com referência a `users`; registros cancelados permanecem
+na base e deixam de bloquear disponibilidade e de compor os indicadores.
 
 Para banco existente, aplique as versões pendentes pelo executor versionado (na raiz; credenciais padrão de DEV):
 
 ```bash
-docker compose exec -T database psql -U hotel_laranjeira -d hotel_laranjeira -v ON_ERROR_STOP=1 < database/migrate.sql
+docker-compose run --rm migrate
 ```
+
+O serviço `migrate` monta a pasta de scripts e executa o arquivo com `-f`,
+permitindo resolver os caminhos relativos de `\ir`. Não redirecione
+`migrate.sql` pela entrada padrão do contêiner `database`, pois ele não possui
+esses arquivos. Em instalações com Compose integrado, use `docker compose`
+no lugar de `docker-compose`.
 
 O executor registra versões e aplica apenas as que faltam. A migração 005
 preserva o texto de documentos existentes e interrompe com erro se encontrar
@@ -43,7 +55,7 @@ Em banco novo, o serviço migrate aplica todos os arquivos automaticamente.
 ## Dados de demonstração
 
 Use somente no banco local de desenvolvimento. O script apaga todos os dados
-atuais de reservas, hóspedes, quartos e categorias antes de carregar a base de
+atuais de auditoria de reservas, reservas, hóspedes, quartos e categorias antes de carregar a base de
 demonstração. Para executá-lo na raiz do projeto:
 
 ```bash

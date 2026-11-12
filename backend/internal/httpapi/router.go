@@ -34,7 +34,13 @@ func NewRouter(db *pgxpool.Pool, cfg config.Config) http.Handler {
 	mux.HandleFunc("GET /api/v1/public/availability", api.publicAvailability)
 	mux.HandleFunc("POST /api/v1/public/reservations", api.createPublicReservation)
 	mux.HandleFunc("GET /api/v1/reservations/availability", api.staffAvailability)
+	mux.HandleFunc("GET /api/v1/reservations", api.listReservations)
+	mux.HandleFunc("GET /api/v1/reservations/summary", api.reservationSummary)
 	mux.HandleFunc("POST /api/v1/reservations", api.createStaffReservation)
+	mux.HandleFunc("POST /api/v1/reservations/{id}/cancel", api.cancelReservation)
+	mux.HandleFunc("GET /api/v1/reservations/{id}", api.getReservation)
+	mux.HandleFunc("PATCH /api/v1/reservations/{id}", api.updateReservation)
+	mux.HandleFunc("GET /api/v1/reservation-events", api.listReservationEvents)
 	mux.HandleFunc("POST /api/v1/auth/login", api.login)
 	mux.HandleFunc("POST /api/v1/auth/refresh", api.refresh)
 	mux.HandleFunc("POST /api/v1/auth/logout", api.logout)
@@ -57,15 +63,21 @@ func NewRouter(db *pgxpool.Pool, cfg config.Config) http.Handler {
 }
 
 func (a *api) requireAuth(w http.ResponseWriter, r *http.Request) bool {
-	if _, err := a.auth.UserFromAccessToken(r.Context(), bearerToken(r)); err != nil {
+	_, ok := a.requireUser(w, r)
+	return ok
+}
+
+func (a *api) requireUser(w http.ResponseWriter, r *http.Request) (auth.User, bool) {
+	user, err := a.auth.UserFromAccessToken(r.Context(), bearerToken(r))
+	if err != nil {
 		if !errors.Is(err, auth.ErrUnauthorized) {
 			internalError(w, err)
-			return false
+			return auth.User{}, false
 		}
 		writeError(w, http.StatusUnauthorized, "unauthorized", "Token de acesso inválido ou expirado.", nil)
-		return false
+		return auth.User{}, false
 	}
-	return true
+	return user, true
 }
 
 func isUUID(value string) bool {

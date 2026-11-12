@@ -89,6 +89,7 @@ export function RecordsPage({ resource }: { resource: Resource }) {
             <td className="px-3 py-4 text-right"><div className="flex flex-wrap justify-end gap-1">
               <button type="button" className={action} disabled={busy !== null} onClick={() => void open(entity, true)}>Detalhes</button>
               <button type="button" className={action} disabled={busy !== null} onClick={() => void open(entity, false)}>Editar</button>
+              {resource === 'guests' && <Link className={action} to={`/reservas?guestId=${encodeURIComponent(entity.id)}`} aria-label={`Histórico de reservas de ${entity.name}`}>Histórico de reservas</Link>}
               {resource === 'rooms' && <button type="button" className={action} disabled={busy !== null} onClick={() => void toggle(entity)}>{entity.isAvailable ? 'Indisponibilizar' : 'Disponibilizar'}</button>}
             </div></td>
           </tr>)}</tbody>

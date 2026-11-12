@@ -124,7 +124,7 @@ func TestPostgresPartialUpdates(t *testing.T) {
 }
 
 func applyReservationTestSchema(ctx context.Context, tx pgx.Tx) error {
-	for _, name := range []string{"003_create_guests_and_rooms.sql", "005_reservations.sql"} {
+	for _, name := range []string{"001_create_users.sql", "003_create_guests_and_rooms.sql", "005_reservations.sql", "006_reservation_management.sql", "007_reservation_audit.sql"} {
 		migration, err := os.ReadFile("../../../database/migrations/" + name)
 		if err != nil {
 			return err

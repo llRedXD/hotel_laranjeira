@@ -19,9 +19,10 @@ var (
 )
 
 type AvailabilityQuery struct {
-	CheckIn   time.Time
-	CheckOut  time.Time
-	Occupants int
+	ReservationID string
+	CheckIn       time.Time
+	CheckOut      time.Time
+	Occupants     int
 }
 
 type AvailabilityOption struct {
@@ -42,6 +43,7 @@ type ReservationGuestInput struct {
 }
 
 type ReservationInput struct {
+	ActorID           string
 	RoomID            string
 	GuestID           string
 	Guest             *ReservationGuestInput
@@ -52,30 +54,72 @@ type ReservationInput struct {
 }
 
 type Reservation struct {
-	ID           string    `json:"id"`
-	GuestID      string    `json:"guestId"`
-	RoomID       string    `json:"roomId"`
-	CheckIn      time.Time `json:"checkIn"`
-	CheckOut     time.Time `json:"checkOut"`
-	Occupants    int       `json:"occupants"`
-	DailyRate    string    `json:"dailyRate"`
-	TotalAmount  string    `json:"totalAmount"`
-	GuestName    string    `json:"guestName"`
-	DocumentType string    `json:"documentType"`
-	Document     string    `json:"document"`
-	ContactEmail string    `json:"contactEmail"`
-	CreatedAt    time.Time `json:"createdAt"`
+	CancelledAt  *time.Time `json:"cancelledAt,omitempty"`
+	CancelledBy  *string    `json:"cancelledBy,omitempty"`
+	Version      int        `json:"version"`
+	Status       string     `json:"status"`
+	CanEdit      bool       `json:"canEdit"`
+	CanCancel    bool       `json:"canCancel"`
+	ID           string     `json:"id"`
+	GuestID      string     `json:"guestId"`
+	RoomID       string     `json:"roomId"`
+	CheckIn      time.Time  `json:"checkIn"`
+	CheckOut     time.Time  `json:"checkOut"`
+	Occupants    int        `json:"occupants"`
+	DailyRate    string     `json:"dailyRate"`
+	TotalAmount  string     `json:"totalAmount"`
+	GuestName    string     `json:"guestName"`
+	DocumentType string     `json:"documentType"`
+	Document     string     `json:"document"`
+	ContactEmail string     `json:"contactEmail"`
+	CreatedAt    time.Time  `json:"createdAt"`
+	RoomNumber   string     `json:"roomNumber"`
+	CategoryName string     `json:"categoryName"`
+}
+
+type ReservationQuery struct {
+	date    time.Time
+	GuestID string
+	Search  string
+	From    time.Time
+	To      time.Time
+	Limit   int
+	Offset  int
+}
+
+type ReservationSummary struct {
+	Date           string `json:"date"`
+	GuestsInHouse  int    `json:"guestsInHouse"`
+	CheckInsToday  int    `json:"checkInsToday"`
+	AvailableRooms int    `json:"availableRooms"`
 }
 
 func (s *Service) ListAvailability(ctx context.Context, query AvailabilityQuery) ([]AvailabilityOption, error) {
 	if err := validateAvailabilityQuery(query); err != nil {
 		return nil, err
 	}
+	var editing Reservation
+	if query.ReservationID != "" {
+		var err error
+		editing, err = s.GetReservation(ctx, query.ReservationID)
+		if err != nil {
+			return nil, err
+		}
+		if !editing.CanEdit {
+			return nil, ErrReservationState
+		}
+		if !query.CheckIn.After(HotelDate(s.now())) {
+			return nil, &ValidationError{Fields: map[string]string{"checkIn": "A nova entrada deve ser posterior à data atual do hotel."}}
+		}
+	}
 	return s.repository.ListAvailability(ctx, query)
 }
 
 func (s *Service) CreateReservation(ctx context.Context, input ReservationInput) (Reservation, error) {
 	fields := map[string]string{}
+	if input.ActorID != "" && !validRoomUUID(input.ActorID) {
+		fields["actor"] = "Funcionário inválido."
+	}
 	if !validRoomUUID(input.RoomID) {
 		fields["roomId"] = "Selecione um quarto válido."
 	}
@@ -104,7 +148,52 @@ func (s *Service) CreateReservation(ctx context.Context, input ReservationInput)
 	if len(fields) > 0 {
 		return Reservation{}, &ValidationError{Fields: fields}
 	}
-	return s.repository.CreateReservation(ctx, input)
+	reservation, err := s.repository.CreateReservation(ctx, input)
+	if err != nil {
+		return Reservation{}, err
+	}
+	reservation.setOperationalState(HotelDate(s.now()))
+	return reservation, nil
+}
+
+func (s *Service) ListReservations(ctx context.Context, query ReservationQuery) ([]Reservation, int, error) {
+	if query.GuestID != "" && !validRoomUUID(query.GuestID) {
+		return nil, 0, &ValidationError{Fields: map[string]string{"guestId": "Informe um hóspede válido."}}
+	}
+	if len(query.Search) > 255 || query.Limit < 1 || query.Limit > 100 || query.Offset < 0 || query.Offset > 100000 {
+		return nil, 0, &ValidationError{Fields: map[string]string{"filters": "Filtros inválidos."}}
+	}
+	if (!query.From.IsZero() && !isCivilDate(query.From)) || (!query.To.IsZero() && !isCivilDate(query.To)) ||
+		(!query.From.IsZero() && !query.To.IsZero() && query.To.Before(query.From)) {
+		return nil, 0, &ValidationError{Fields: map[string]string{"dates": "Informe um intervalo válido."}}
+	}
+	reader, ok := s.repository.(reservationReader)
+	if !ok {
+		return nil, 0, fmt.Errorf("repositório não oferece consulta de reservas")
+	}
+	date := HotelDate(s.now())
+	query.date = date
+	reservations, total, err := reader.ListReservations(ctx, query)
+	if err != nil {
+		return nil, 0, err
+	}
+	for i := range reservations {
+		reservations[i].setOperationalState(date)
+	}
+	return reservations, total, nil
+}
+
+func (s *Service) ReservationSummary(ctx context.Context, date time.Time) (ReservationSummary, error) {
+	if !isCivilDate(date) {
+		return ReservationSummary{}, &ValidationError{Fields: map[string]string{"date": "Informe uma data válida."}}
+	}
+	reader, ok := s.repository.(reservationReader)
+	if !ok {
+		return ReservationSummary{}, fmt.Errorf("repositório não oferece resumo de reservas")
+	}
+	summary, err := reader.ReservationSummary(ctx, date)
+	summary.Date = date.Format("2006-01-02")
+	return summary, err
 }
 
 func validateAvailabilityQuery(query AvailabilityQuery) error {

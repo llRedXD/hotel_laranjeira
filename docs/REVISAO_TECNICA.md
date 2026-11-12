@@ -28,13 +28,13 @@ construídas anteriormente já contenham as últimas alterações.
 | Componente | Responsabilidade |
 | --- | --- |
 | httpapi | Decodificação HTTP, autenticação das rotas e tradução de erros |
-| hotel.Service | Validação e normalização de hóspedes/categorias |
+| hotel.Service | Validação de cadastros, reservas, filtros e permissões operacionais |
 | auth.Service | Regras de autenticação, bcrypt, JWT e geração/hash de tokens |
 | Repository de cada módulo | Contrato de persistência injetado no serviço |
 | PostgresRepository de cada módulo | Consultas SQL e operações transacionais |
 | database | Configuração e gerenciamento do pool PostgreSQL |
 
-PATCH preserva campos omitidos, aceita null para limpar opcionais e rejeita
+PATCH de hóspedes/categorias preserva campos omitidos, aceita null para limpar opcionais e rejeita
 remoção de nome. Strings opcionais vazias também limpam o campo; objetos
 vazios recebem 422. Tipos incorretos e campos desconhecidos recebem 400.
 
@@ -57,9 +57,27 @@ O repositório recebe hashes, não senhas nem tokens brutos.
 
 Instruções de operação em [DOCKER.md](DOCKER.md).
 
+## Gestão de reservas
+
+- Migrações 005–007: reservas e snapshots, versão/cancelamento e auditoria.
+- Criação pública e interna compartilham disponibilidade, cálculo e bloqueio
+  transacional do quarto. Diária e total são preservados na reserva.
+- Consulta paginada por busca, ocupação no intervalo e identificador do hóspede.
+- Status previstos e permissões calculados pela data de São Paulo.
+- Cancelamento e edição revalidam estado/versão depois dos bloqueios; edição
+  bloqueia os quartos em ordem consistente antes da reserva.
+- Mesma acomodação preserva diária contratada; outra usa a diária atual.
+- Trigger registra criação/cancelamento/edição com snapshots e autoria na mesma
+  transação. Erro ao gravar auditoria desfaz a alteração da reserva.
+- Registros anteriores recebem uma base inicial; transições automáticas pelas
+  datas continuam calculadas, sem eventos históricos artificiais.
+- Interface de edição por etapas, cancelamento com confirmação e auditoria no
+  menu. A recepção invalida cotações ao mudar período/pessoas; inputs de busca
+  ficam bloqueados durante consulta e confirmação.
+
 ## Validação realizada
 
-- Testes Go e go vet passaram após a refatoração de autenticação.
+- Testes Go e go vet passaram na validação final, incluindo PostgreSQL 17 sem SKIP.
 - Integração de hotel com PostgreSQL: preservação de campos omitidos, limpeza
   com null, rejeição de nome nulo/PATCH vazio, inexistência e conflito de categoria.
 - Integração de autenticação com PostgreSQL: login, senha incorreta, conta
@@ -69,16 +87,24 @@ Instruções de operação em [DOCKER.md](DOCKER.md).
   rejeição de origem, paginação e limite de tentativas.
 - Testes de integração usam esquemas temporários em transações com rollback;
   sem TEST_DATABASE_URL, são explicitamente pulados.
-- Lint/build React e fluxo frontend → API → PostgreSQL via Docker foram
-  verificados na preparação do ambiente, antes da última refatoração Go.
+- Lint/build React e fluxo frontend → API → PostgreSQL foram verificados com
+  criação pública, filtros, histórico, edição, cancelamento, auditoria e nova
+  criação pela recepção no período liberado, em desktop/celular.
+- Migrações verificadas em banco novo, atualização da versão 005 para 007 com
+  reserva existente e reexecução sem duplicação de versões ou auditoria inicial.
+- Concorrência entre criação, edição e cancelamento de reservas foi verificada
+  com conexões independentes; falhas induzidas na auditoria confirmam rollback.
 
 Comandos de reprodução em [backend/README.md](../backend/README.md).
-Essa cobertura não substitui testes concorrentes com conexões independentes,
-testes de carga nem testes ponta a ponta no navegador.
+A cobertura detalhada e o roteiro de aceite estão em
+[Validação final de reservas](VALIDACAO_FINAL_RESERVAS.md). Testes de carga não
+fazem parte desta validação.
 
 ## Desempenho e regras pendentes
 
-Documento é opcional e não tem verificação de CPF/passaporte.
+Documento é opcional no cadastro interno; reserva exige tipo RG/CPF e número.
+O frontend valida os dígitos do CPF, enquanto a API valida obrigatoriedade,
+formato dos campos e tamanho, sem validação formal de RG/CPF.
 Listas possuem limites; busca ILIKE por substring ainda pode fazer varredura.
 Índices especializados devem ser introduzidos com medições representativas.
 Não há benchmark que demonstre ganho de latência com estas refatorações.

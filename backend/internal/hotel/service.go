@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/mail"
 	"strings"
+	"time"
 	"unicode/utf8"
 )
 
@@ -34,9 +35,19 @@ type Repository interface {
 	CreateReservation(context.Context, ReservationInput) (Reservation, error)
 }
 
-type Service struct{ repository Repository }
+type reservationReader interface {
+	ListReservations(context.Context, ReservationQuery) ([]Reservation, int, error)
+	ReservationSummary(context.Context, time.Time) (ReservationSummary, error)
+}
 
-func NewService(repository Repository) *Service { return &Service{repository: repository} }
+type Service struct {
+	repository Repository
+	now        func() time.Time
+}
+
+func NewService(repository Repository) *Service {
+	return &Service{repository: repository, now: time.Now}
+}
 
 func normalize(f Field, key string, max int, required bool, fields map[string]string) Field {
 	if !f.Set {

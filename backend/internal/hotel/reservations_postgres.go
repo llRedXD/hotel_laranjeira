@@ -3,23 +3,33 @@ package hotel
 import (
 	"context"
 	"errors"
+	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 )
 
 func (s *PostgresRepository) ListAvailability(ctx context.Context, query AvailabilityQuery) ([]AvailabilityOption, error) {
-	rows, err := s.db.Query(ctx, `SELECT r.id, r.number, c.name, r.capacity, r.daily_rate::text
+	var excluded any
+	if query.ReservationID != "" {
+		excluded = query.ReservationID
+	}
+	rows, err := s.db.Query(ctx, `SELECT r.id, r.number, c.name, r.capacity,
+        CASE WHEN r.id = (SELECT room_id FROM reservations WHERE id=$4::uuid)
+          THEN (SELECT daily_rate FROM reservations WHERE id=$4::uuid)
+          ELSE r.daily_rate END::text
 		FROM rooms r
 		JOIN room_categories c ON c.id = r.category_id
 		WHERE r.is_available = TRUE
 		  AND r.capacity >= $1
 		  AND NOT EXISTS (
 			SELECT 1 FROM reservations current
-			WHERE current.room_id = r.id
+			WHERE current.cancelled_at IS NULL AND current.room_id = r.id
+			  AND ($4::uuid IS NULL OR current.id <> $4::uuid)
 			  AND current.check_in < $3
 			  AND current.check_out > $2
 		  )
-		ORDER BY r.number, r.id`, query.Occupants, query.CheckIn, query.CheckOut)
+		ORDER BY r.number, r.id`, query.Occupants, query.CheckIn, query.CheckOut, excluded)
 	if err != nil {
 		return nil, err
 	}
@@ -39,12 +49,80 @@ func (s *PostgresRepository) ListAvailability(ctx context.Context, query Availab
 	return options, rows.Err()
 }
 
+func (s *PostgresRepository) ListReservations(ctx context.Context, query ReservationQuery) ([]Reservation, int, error) {
+	search := strings.TrimSpace(query.Search)
+	var from, to, guestID any
+	if query.GuestID != "" {
+		guestID = query.GuestID
+	}
+	if !query.From.IsZero() {
+		from = query.From
+	}
+	if !query.To.IsZero() {
+		to = query.To
+	}
+	const where = `($1 = '' OR r.guest_name_snapshot ILIKE '%' || $1 || '%' OR rm.number ILIKE '%' || $1 || '%' OR r.document_snapshot ILIKE '%' || $1 || '%')
+		AND ($2::date IS NULL OR r.check_out > $2::date)
+		AND ($3::date IS NULL OR r.check_in <= $3::date)
+		AND ($4::uuid IS NULL OR r.guest_id = $4::uuid)`
+	var total int
+	if err := s.db.QueryRow(ctx, `SELECT count(*) FROM reservations r JOIN rooms rm ON rm.id = r.room_id WHERE `+where,
+		search, from, to, guestID).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	rows, err := s.db.Query(ctx, `SELECT r.id, r.guest_id, r.room_id, r.check_in, r.check_out, r.occupants,
+		r.daily_rate::text, r.total_amount::text, r.guest_name_snapshot, r.document_type_snapshot,
+		r.document_snapshot, r.contact_email_snapshot, r.created_at, rm.number, c.name, r.cancelled_at, r.cancelled_by, r.version
+		FROM reservations r JOIN rooms rm ON rm.id = r.room_id JOIN room_categories c ON c.id = rm.category_id
+		WHERE `+where+` ORDER BY CASE
+			WHEN r.cancelled_at IS NOT NULL THEN 3
+			WHEN r.check_in <= $7::date AND r.check_out > $7::date THEN 0
+			WHEN r.check_in > $7::date THEN 1 ELSE 2 END,
+		r.check_in ASC, r.created_at DESC, r.id LIMIT $5 OFFSET $6`,
+		search, from, to, guestID, query.Limit, query.Offset, query.date)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	reservations := make([]Reservation, 0)
+	for rows.Next() {
+		var reservation Reservation
+		if err := rows.Scan(&reservation.ID, &reservation.GuestID, &reservation.RoomID,
+			&reservation.CheckIn, &reservation.CheckOut, &reservation.Occupants, &reservation.DailyRate,
+			&reservation.TotalAmount, &reservation.GuestName, &reservation.DocumentType, &reservation.Document,
+			&reservation.ContactEmail, &reservation.CreatedAt, &reservation.RoomNumber, &reservation.CategoryName,
+			&reservation.CancelledAt, &reservation.CancelledBy, &reservation.Version); err != nil {
+			return nil, 0, err
+		}
+		reservations = append(reservations, reservation)
+	}
+	return reservations, total, rows.Err()
+}
+
+func (s *PostgresRepository) ReservationSummary(ctx context.Context, date time.Time) (ReservationSummary, error) {
+	var summary ReservationSummary
+	err := s.db.QueryRow(ctx, `SELECT
+		COALESCE((SELECT sum(occupants) FROM reservations WHERE cancelled_at IS NULL AND check_in <= $1 AND check_out > $1), 0)::int,
+		(SELECT count(*) FROM reservations WHERE cancelled_at IS NULL AND check_in = $1),
+		(SELECT count(*) FROM rooms rm WHERE rm.is_available = TRUE AND NOT EXISTS (
+			SELECT 1 FROM reservations r WHERE r.cancelled_at IS NULL AND r.room_id = rm.id AND r.check_in <= $1 AND r.check_out > $1
+		))`, date).Scan(&summary.GuestsInHouse, &summary.CheckInsToday, &summary.AvailableRooms)
+	return summary, err
+}
+
 func (s *PostgresRepository) CreateReservation(ctx context.Context, input ReservationInput) (Reservation, error) {
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
 		return Reservation{}, err
 	}
 	defer tx.Rollback(ctx)
+	source := "public"
+	if input.ActorID != "" {
+		source = "staff"
+	}
+	if _, err = tx.Exec(ctx, `SELECT set_config('hotel.actor_id',$1,true), set_config('hotel.event_source',$2,true)`, input.ActorID, source); err != nil {
+		return Reservation{}, err
+	}
 
 	var capacity int
 	var isAvailable bool
@@ -67,7 +145,7 @@ func (s *PostgresRepository) CreateReservation(ctx context.Context, input Reserv
 	}
 	var conflicting bool
 	if err = tx.QueryRow(ctx, `SELECT EXISTS (
-		SELECT 1 FROM reservations WHERE room_id = $1 AND check_in < $3 AND check_out > $2
+		SELECT 1 FROM reservations WHERE cancelled_at IS NULL AND room_id = $1 AND check_in < $3 AND check_out > $2
 	)`, input.RoomID, input.CheckIn, input.CheckOut).Scan(&conflicting); err != nil {
 		return Reservation{}, err
 	}
@@ -102,9 +180,9 @@ func (s *PostgresRepository) CreateReservation(ctx context.Context, input Reserv
 		guest_id, room_id, check_in, check_out, occupants, daily_rate, total_amount,
 		guest_name_snapshot, document_type_snapshot, document_snapshot, contact_email_snapshot
 	) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-	RETURNING id, created_at`, guestID, input.RoomID, input.CheckIn, input.CheckOut,
+	RETURNING id, created_at, version`, guestID, input.RoomID, input.CheckIn, input.CheckOut,
 		input.Occupants, dailyRate, total, guestSnapshot.Name, guestSnapshot.DocumentType,
-		guestSnapshot.Document, guestSnapshot.Email).Scan(&reservation.ID, &reservation.CreatedAt)
+		guestSnapshot.Document, guestSnapshot.Email).Scan(&reservation.ID, &reservation.CreatedAt, &reservation.Version)
 	if err != nil {
 		return Reservation{}, repositoryError(err)
 	}
