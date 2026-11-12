@@ -40,9 +40,14 @@ type reservationReader interface {
 	ReservationSummary(context.Context, time.Time) (ReservationSummary, error)
 }
 
-type Service struct{ repository Repository }
+type Service struct {
+	repository Repository
+	now        func() time.Time
+}
 
-func NewService(repository Repository) *Service { return &Service{repository: repository} }
+func NewService(repository Repository) *Service {
+	return &Service{repository: repository, now: time.Now}
+}
 
 func normalize(f Field, key string, max int, required bool, fields map[string]string) Field {
 	if !f.Set {

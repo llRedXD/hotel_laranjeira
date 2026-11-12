@@ -1,7 +1,8 @@
--- Reseta somente os dados operacionais do hotel e carrega uma base de demonstração.
+-- Reseta os dados operacionais e a auditoria das reservas; carrega demonstração.
 -- Mantém users, refresh_tokens, password_reset_tokens e schema_migrations intactos.
 BEGIN;
 
+DELETE FROM reservation_events;
 DELETE FROM reservations;
 DELETE FROM guests;
 DELETE FROM rooms;

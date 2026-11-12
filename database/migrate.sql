@@ -58,4 +58,14 @@ SELECT NOT EXISTS(SELECT 1 FROM schema_migrations WHERE version=5) AS pending \g
 \ir migrations/005_reservations.sql
 INSERT INTO schema_migrations(version) VALUES (5);
 \endif
+SELECT NOT EXISTS(SELECT 1 FROM schema_migrations WHERE version=6) AS pending \gset
+\if :pending
+\ir migrations/006_reservation_management.sql
+INSERT INTO schema_migrations(version) VALUES (6);
+\endif
+SELECT NOT EXISTS(SELECT 1 FROM schema_migrations WHERE version=7) AS pending \gset
+\if :pending
+\ir migrations/007_reservation_audit.sql
+INSERT INTO schema_migrations(version) VALUES (7);
+\endif
 COMMIT;

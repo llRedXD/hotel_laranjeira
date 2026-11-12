@@ -84,3 +84,23 @@ func TestStaffAvailabilityRequiresAuthentication(t *testing.T) {
 		t.Fatalf("expected 401, got %d: %s", recorder.Code, recorder.Body.String())
 	}
 }
+
+func TestCancellationAndAuditRequireAuthentication(t *testing.T) {
+	server := &api{auth: auth.NewService(nil, "01234567890123456789012345678901")}
+	for _, test := range []struct {
+		method, path string
+		handler      http.HandlerFunc
+	}{
+		{http.MethodPost, "/api/v1/reservations/00000000-0000-4000-8000-000000000001/cancel", server.cancelReservation},
+		{http.MethodGet, "/api/v1/reservation-events", server.listReservationEvents},
+		{http.MethodGet, "/api/v1/reservations/00000000-0000-4000-8000-000000000001", server.getReservation},
+		{http.MethodPatch, "/api/v1/reservations/00000000-0000-4000-8000-000000000001", server.updateReservation},
+	} {
+		request := httptest.NewRequest(test.method, test.path, nil)
+		recorder := httptest.NewRecorder()
+		test.handler(recorder, request)
+		if recorder.Code != http.StatusUnauthorized {
+			t.Fatalf("%s: status=%d body=%s", test.path, recorder.Code, recorder.Body.String())
+		}
+	}
+}

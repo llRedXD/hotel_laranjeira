@@ -33,7 +33,7 @@ func TestReservationAvailabilityCreationAndConcurrency(t *testing.T) {
 	if _, err := admin.Exec(ctx, "SET search_path TO "+schema+", public"); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"003_create_guests_and_rooms.sql", "005_reservations.sql"} {
+	for _, name := range []string{"001_create_users.sql", "003_create_guests_and_rooms.sql", "005_reservations.sql", "006_reservation_management.sql", "007_reservation_audit.sql"} {
 		migration, readErr := os.ReadFile("../../../database/migrations/" + name)
 		if readErr != nil {
 			t.Fatal(readErr)

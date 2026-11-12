@@ -1,10 +1,28 @@
 package hotel
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
 )
+
+func TestReservationQueryRejectsInvalidFilters(t *testing.T) {
+	service := NewService(nil)
+	date := time.Date(2026, 11, 11, 0, 0, 0, 0, time.UTC)
+	for _, query := range []ReservationQuery{
+		{GuestID: "invalid", Limit: 20},
+		{From: date.AddDate(0, 0, 1), To: date, Limit: 20},
+		{From: date.Add(time.Hour), Limit: 20},
+		{Limit: 0}, {Limit: 101}, {Limit: 20, Offset: -1}, {Limit: 20, Offset: 100001},
+	} {
+		_, _, err := service.ListReservations(context.Background(), query)
+		var validation *ValidationError
+		if !errors.As(err, &validation) {
+			t.Errorf("query=%+v err=%v", query, err)
+		}
+	}
+}
 
 func TestReservationNightsAndTotal(t *testing.T) {
 	checkIn := time.Date(2026, 11, 10, 0, 0, 0, 0, time.UTC)

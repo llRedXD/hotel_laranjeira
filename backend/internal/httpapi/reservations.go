@@ -26,6 +26,10 @@ type reservationRequest struct {
 }
 
 type reservationDateResponse struct {
+	Version      int    `json:"version,omitempty"`
+	CanEdit      *bool  `json:"canEdit,omitempty"`
+	CanCancel    *bool  `json:"canCancel,omitempty"`
+	Status       string `json:"status,omitempty"`
 	ID           string `json:"id"`
 	GuestID      string `json:"guestId,omitempty"`
 	RoomID       string `json:"roomId"`
@@ -64,7 +68,7 @@ func (a *api) staffAvailability(w http.ResponseWriter, r *http.Request) {
 		writeValidationError(w, map[string]string{"filters": "Informe um período e uma quantidade válidos."})
 		return
 	}
-	rooms, err := a.hotel.ListAvailability(r.Context(), hotel.AvailabilityQuery{CheckIn: query.CheckIn, CheckOut: query.CheckOut, Occupants: query.Occupants})
+	rooms, err := a.hotel.ListAvailability(r.Context(), hotel.AvailabilityQuery{ReservationID: r.URL.Query().Get("reservationId"), CheckIn: query.CheckIn, CheckOut: query.CheckOut, Occupants: query.Occupants})
 	if writeReservationError(w, err) {
 		return
 	}
@@ -95,20 +99,15 @@ func (a *api) listReservations(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	reservations, total, err := a.hotel.ListReservations(r.Context(), hotel.ReservationQuery{
-		Search: search, From: from, To: to, Limit: limit, Offset: offset,
+		GuestID: r.URL.Query().Get("guestId"),
+		Search:  search, From: from, To: to, Limit: limit, Offset: offset,
 	})
 	if writeReservationError(w, err) {
 		return
 	}
 	items := make([]reservationDateResponse, 0, len(reservations))
 	for _, reservation := range reservations {
-		items = append(items, reservationDateResponse{
-			ID: reservation.ID, GuestID: reservation.GuestID, RoomID: reservation.RoomID,
-			CheckIn: reservation.CheckIn.Format("2006-01-02"), CheckOut: reservation.CheckOut.Format("2006-01-02"),
-			Occupants: reservation.Occupants, DailyRate: reservation.DailyRate, TotalAmount: reservation.TotalAmount,
-			GuestName: reservation.GuestName, DocumentType: reservation.DocumentType, Document: reservation.Document,
-			ContactEmail: reservation.ContactEmail, RoomNumber: reservation.RoomNumber, CategoryName: reservation.CategoryName,
-		})
+		items = append(items, staffReservationResponse(reservation))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"reservations": items, "total": total})
 }
@@ -118,9 +117,12 @@ func (a *api) reservationSummary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	date, err := parseOptionalDate(r.URL.Query().Get("date"))
-	if err != nil || date.IsZero() {
+	if err != nil {
 		writeValidationError(w, map[string]string{"date": "Informe uma data no formato AAAA-MM-DD."})
 		return
+	}
+	if date.IsZero() {
+		date = hotel.HotelDate(time.Now())
 	}
 	summary, err := a.hotel.ReservationSummary(r.Context(), date)
 	if writeReservationError(w, err) {
@@ -159,7 +161,8 @@ func (a *api) createPublicReservation(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *api) createStaffReservation(w http.ResponseWriter, r *http.Request) {
-	if !a.requireAuth(w, r) {
+	user, ok := a.requireUser(w, r)
+	if !ok {
 		return
 	}
 	var request reservationRequest
@@ -171,7 +174,7 @@ func (a *api) createStaffReservation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	reservation, err := a.hotel.CreateReservation(r.Context(), hotel.ReservationInput{
-		RoomID: request.RoomID, GuestID: request.GuestID, CheckIn: checkIn, CheckOut: checkOut, Occupants: request.Occupants, ExpectedDailyRate: request.ExpectedDailyRate,
+		ActorID: user.ID, RoomID: request.RoomID, GuestID: request.GuestID, CheckIn: checkIn, CheckOut: checkOut, Occupants: request.Occupants, ExpectedDailyRate: request.ExpectedDailyRate,
 	})
 	if writeReservationError(w, err) {
 		return
@@ -208,6 +211,10 @@ func parseReservationDates(w http.ResponseWriter, checkInValue, checkOutValue st
 func writeReservationError(w http.ResponseWriter, err error) bool {
 	if err == nil {
 		return false
+	}
+	if errors.Is(err, hotel.ErrReservationState) {
+		writeError(w, http.StatusConflict, "reservation_state", "A reserva foi alterada ou não permite esta operação. Atualize a consulta.", nil)
+		return true
 	}
 	var validation *hotel.ValidationError
 	if errors.As(err, &validation) {
