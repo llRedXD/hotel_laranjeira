@@ -85,7 +85,9 @@ func (s *PostgresRepository) UpdateReservation(ctx context.Context, input Reserv
 		return Reservation{}, ErrReservationConflict
 	}
 	var conflicting bool
-	if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM reservations WHERE room_id=$1 AND id<>$2 AND cancelled_at IS NULL AND check_in<$4 AND check_out>$3)`, input.RoomID, input.ID, input.CheckIn, input.CheckOut).Scan(&conflicting); err != nil {
+	if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM reservations WHERE room_id=$1 AND id<>$2 AND cancelled_at IS NULL
+		AND COALESCE((checked_in_at AT TIME ZONE 'America/Sao_Paulo')::date, check_in)<$4
+		AND COALESCE((checked_out_at AT TIME ZONE 'America/Sao_Paulo')::date, check_out)>$3)`, input.RoomID, input.ID, input.CheckIn, input.CheckOut).Scan(&conflicting); err != nil {
 		return Reservation{}, err
 	}
 	if conflicting {

@@ -9,15 +9,17 @@ import (
 )
 
 type Room struct {
-	ID           string    `json:"id"`
-	Number       string    `json:"number"`
-	CategoryID   string    `json:"categoryId"`
-	CategoryName string    `json:"categoryName"`
-	Capacity     int       `json:"capacity"`
-	DailyRate    string    `json:"dailyRate"`
-	IsAvailable  bool      `json:"isAvailable"`
-	CreatedAt    time.Time `json:"createdAt"`
-	UpdatedAt    time.Time `json:"updatedAt"`
+	ID                      string    `json:"id"`
+	Number                  string    `json:"number"`
+	CategoryID              string    `json:"categoryId"`
+	CategoryName            string    `json:"categoryName"`
+	Capacity                int       `json:"capacity"`
+	DailyRate               string    `json:"dailyRate"`
+	IsAvailable             bool      `json:"isAvailable"`
+	IsOccupied              bool      `json:"isOccupied"`
+	OccupiedByReservationID *string   `json:"occupiedByReservationId,omitempty"`
+	CreatedAt               time.Time `json:"createdAt"`
+	UpdatedAt               time.Time `json:"updatedAt"`
 }
 
 // Decimal prices are strings to avoid binary floating-point rounding.

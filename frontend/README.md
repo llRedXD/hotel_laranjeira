@@ -43,6 +43,9 @@ conflitos ao confirmar.
 A gestão interna permite busca textual, filtro por noites ocupadas e histórico
 exato por hóspede, acessível pelo cadastro em `/hospedes`. A listagem usa status
 e permissões do servidor. Cancelamento exige confirmação e mantém o histórico.
+A equipe também pode registrar check-in e check-out pela listagem ou pelos
+detalhes da reserva; o checkout apresenta uma prévia calculada pela API. O
+quarto exibe ocupação operacional separada da habilitação para venda.
 A edição em `/reservas/:id/editar` tem três etapas: escolher datas/pessoas/quarto,
 ajustar apenas os campos correspondentes e revisar o antes/depois. A gravação
 acontece somente na confirmação final. A auditoria fica no menu `/auditoria`,

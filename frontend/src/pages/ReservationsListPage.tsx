@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ReservationStatusBadge } from '../components/ReservationStatusBadge'
 import { CancelReservationDialog } from '../components/CancelReservationDialog'
+import { ReservationStayActions } from '../components/ReservationStayActions'
 import { APIError } from '../services/api'
 import { formatBRL, formatReservationDate } from '../services/reservations'
 import { getEntity, listReservations, pageSize, type Entity, type ReceptionReservation } from '../services/hotel'
@@ -141,9 +142,16 @@ export function ReservationsListPage() {
               <td className="whitespace-nowrap px-4 py-4">{formatReservationDate(reservation.checkIn)} <span className="text-ink/40">→</span> {formatReservationDate(reservation.checkOut)}</td>
               <td className="px-4 py-4">{reservation.occupants}</td>
               <td className="px-4 py-4"><ReservationStatusBadge status={reservation.status} /></td>
-              <td className="whitespace-nowrap px-5 py-4 text-right font-semibold tabular-nums">{formatBRL(reservation.totalAmount)}</td>
+              <td className="whitespace-nowrap px-5 py-4 text-right font-semibold tabular-nums">{formatBRL(reservation.finalAmount ?? reservation.totalAmount)}{reservation.finalAmount && <span className="mt-1 block text-xs font-normal text-ink/55">valor final</span>}</td>
               <td className="px-5 py-4"><div className="flex flex-wrap justify-end gap-2">
-                {reservation.canEdit && <Link to={`/reservas/${encodeURIComponent(reservation.id)}/editar`} state={{ returnTo: `/reservas${queryKey ? `?${queryKey}` : ''}` }} className="rounded-lg px-3 py-2 text-sm font-semibold text-forest hover:bg-forest/10 focus-visible:outline-orange">Alterar</Link>}
+                {(reservation.canCheckIn || reservation.canCheckOut) && <ReservationStayActions reservation={reservation}
+                  onUpdated={updated => {
+                    setReservations(current => current.map(item => item.id === updated.id ? updated : item))
+                    setSuccess(updated.status === 'in_house' ? `Check-in realizado para ${updated.guestName}. Quarto ${updated.roomNumber} está ocupado.` : `Check-out concluído. Valor final: ${formatBRL(updated.finalAmount ?? '0.00')}. Quarto ${updated.roomNumber} liberado.`)
+                    setRevision(value => value + 1)
+                  }}
+                  onReload={() => setRevision(value => value + 1)} />}
+                <Link to={`/reservas/${encodeURIComponent(reservation.id)}/editar`} state={{ returnTo: `/reservas${queryKey ? `?${queryKey}` : ''}` }} className="rounded-lg px-3 py-2 text-sm font-semibold text-forest hover:bg-forest/10 focus-visible:outline-orange">{reservation.canEdit ? 'Alterar' : 'Detalhes'}</Link>
                 {reservation.canCancel && <button type="button" onClick={() => { setSuccess(''); setCancelling(reservation) }} className="rounded-lg px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 focus-visible:outline-orange">Cancelar</button>}
               </div></td>
             </tr>

@@ -28,6 +28,7 @@ consulte a adoção de histórico em [DOCKER.md](../docs/DOCKER.md).
 | 005 | tipo e normalização de documento; reservas, snapshots e índices por quarto/período |
 | 006 | metadados de cancelamento e versão de reservas; preserva reservas existentes |
 | 007 | eventos de auditoria, registro inicial das reservas existentes e captura transacional de criação/alteração/cancelamento |
+| 008 | check-in/check-out realizados, valor final, ocupação do quarto e eventos auditados |
 
 A versão da reserva começa em 1. Cancelamento exige data e funcionário
 responsável juntos, com referência a `users`; registros cancelados permanecem
@@ -67,3 +68,16 @@ Ele preserva as contas de usuário, sessões/tokens de autenticação, tokens de
 redefinição de senha e o histórico de migrações. A base inclui uma reserva
 futura no quarto 101 para demonstrar conflito de período; as datas são
 calculadas em relação ao dia em que o script é executado.
+
+Para a apresentação do ciclo de check-in e checkout, use o seed isolado abaixo
+em vez de recriar toda a base:
+
+```bash
+docker compose exec -T database psql -U hotel_laranjeira -d hotel_laranjeira -v ON_ERROR_STOP=1 < database/seed_presentation.sql
+```
+
+Ele requer as migrações 001–008 e uma conta de funcionário já criada. O script
+é repetível e só recria suas duas reservas e seus dados identificados como
+apresentação; não remove reservas, hóspedes, quartos ou auditoria alheios. Veja
+o [roteiro de apresentação](../docs/ROTEIRO_APRESENTACAO_CICLO_RESERVA.md) para
+as contas e a sequência de telas.

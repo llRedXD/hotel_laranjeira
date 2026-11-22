@@ -5,6 +5,8 @@ const statuses: Record<ReservationStatus, { label: string, style: string }> = {
   in_progress: { label: 'Estadia prevista em andamento', style: 'bg-moss/15 text-forest' },
   departure_today: { label: 'Saída prevista hoje', style: 'bg-peach/35 text-orange' },
   ended: { label: 'Encerrada pelo período', style: 'bg-sand text-ink/65' },
+  in_house: { label: 'Em hospedagem', style: 'bg-moss/20 text-forest' },
+  completed: { label: 'Finalizada', style: 'bg-forest text-cream' },
   cancelled: { label: 'Cancelada', style: 'bg-red-50 text-red-700' },
 }
 

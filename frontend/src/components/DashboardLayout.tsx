@@ -9,7 +9,6 @@ const menuItems = [
   { label: 'Hóspedes', to: '/hospedes', icon: '♙' },
   { label: 'Quartos', to: '/quartos', icon: '▤' },
   { label: 'Categorias', to: '/categorias', icon: '▦' },
-  { label: 'Pagamentos', to: '/painel', icon: '◈', disabled: true },
 ]
 
 export function DashboardLayout() {

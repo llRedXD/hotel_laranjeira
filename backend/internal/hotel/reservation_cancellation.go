@@ -35,14 +35,18 @@ func (s *Service) CancelReservation(ctx context.Context, input CancelReservation
 const reservationSelect = `SELECT r.id, r.guest_id, r.room_id, r.check_in, r.check_out, r.occupants,
  r.daily_rate::text, r.total_amount::text, r.guest_name_snapshot, r.document_type_snapshot,
  r.document_snapshot, r.contact_email_snapshot, r.created_at, rm.number, c.name,
- r.cancelled_at, r.cancelled_by, r.version
+ r.cancelled_at, r.cancelled_by, r.version, r.checked_in_at, r.checked_in_by,
+ r.checked_out_at, r.checked_out_by, r.actual_nights, r.final_amount::text,
+ (SELECT name FROM users WHERE id=r.checked_in_by), (SELECT name FROM users WHERE id=r.checked_out_by)
  FROM reservations r JOIN rooms rm ON rm.id = r.room_id JOIN room_categories c ON c.id = rm.category_id`
 
 func scanReservation(row pgx.Row) (Reservation, error) {
 	var r Reservation
 	err := row.Scan(&r.ID, &r.GuestID, &r.RoomID, &r.CheckIn, &r.CheckOut, &r.Occupants,
 		&r.DailyRate, &r.TotalAmount, &r.GuestName, &r.DocumentType, &r.Document, &r.ContactEmail,
-		&r.CreatedAt, &r.RoomNumber, &r.CategoryName, &r.CancelledAt, &r.CancelledBy, &r.Version)
+		&r.CreatedAt, &r.RoomNumber, &r.CategoryName, &r.CancelledAt, &r.CancelledBy, &r.Version,
+		&r.CheckedInAt, &r.CheckedInBy, &r.CheckedOutAt, &r.CheckedOutBy, &r.ActualNights, &r.FinalAmount,
+		&r.CheckedInByName, &r.CheckedOutByName)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Reservation{}, ErrNotFound
 	}

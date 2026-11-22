@@ -54,27 +54,37 @@ type ReservationInput struct {
 }
 
 type Reservation struct {
-	CancelledAt  *time.Time `json:"cancelledAt,omitempty"`
-	CancelledBy  *string    `json:"cancelledBy,omitempty"`
-	Version      int        `json:"version"`
-	Status       string     `json:"status"`
-	CanEdit      bool       `json:"canEdit"`
-	CanCancel    bool       `json:"canCancel"`
-	ID           string     `json:"id"`
-	GuestID      string     `json:"guestId"`
-	RoomID       string     `json:"roomId"`
-	CheckIn      time.Time  `json:"checkIn"`
-	CheckOut     time.Time  `json:"checkOut"`
-	Occupants    int        `json:"occupants"`
-	DailyRate    string     `json:"dailyRate"`
-	TotalAmount  string     `json:"totalAmount"`
-	GuestName    string     `json:"guestName"`
-	DocumentType string     `json:"documentType"`
-	Document     string     `json:"document"`
-	ContactEmail string     `json:"contactEmail"`
-	CreatedAt    time.Time  `json:"createdAt"`
-	RoomNumber   string     `json:"roomNumber"`
-	CategoryName string     `json:"categoryName"`
+	CancelledAt      *time.Time `json:"cancelledAt,omitempty"`
+	CancelledBy      *string    `json:"cancelledBy,omitempty"`
+	CheckedInAt      *time.Time `json:"checkedInAt,omitempty"`
+	CheckedInBy      *string    `json:"checkedInBy,omitempty"`
+	CheckedInByName  *string    `json:"checkedInByName,omitempty"`
+	CheckedOutAt     *time.Time `json:"checkedOutAt,omitempty"`
+	CheckedOutBy     *string    `json:"checkedOutBy,omitempty"`
+	CheckedOutByName *string    `json:"checkedOutByName,omitempty"`
+	ActualNights     *int       `json:"actualNights,omitempty"`
+	FinalAmount      *string    `json:"finalAmount,omitempty"`
+	Version          int        `json:"version"`
+	Status           string     `json:"status"`
+	CanEdit          bool       `json:"canEdit"`
+	CanCancel        bool       `json:"canCancel"`
+	CanCheckIn       bool       `json:"canCheckIn"`
+	CanCheckOut      bool       `json:"canCheckOut"`
+	ID               string     `json:"id"`
+	GuestID          string     `json:"guestId"`
+	RoomID           string     `json:"roomId"`
+	CheckIn          time.Time  `json:"checkIn"`
+	CheckOut         time.Time  `json:"checkOut"`
+	Occupants        int        `json:"occupants"`
+	DailyRate        string     `json:"dailyRate"`
+	TotalAmount      string     `json:"totalAmount"`
+	GuestName        string     `json:"guestName"`
+	DocumentType     string     `json:"documentType"`
+	Document         string     `json:"document"`
+	ContactEmail     string     `json:"contactEmail"`
+	CreatedAt        time.Time  `json:"createdAt"`
+	RoomNumber       string     `json:"roomNumber"`
+	CategoryName     string     `json:"categoryName"`
 }
 
 type ReservationQuery struct {
@@ -270,10 +280,32 @@ func calculateReservationTotal(checkIn, checkOut time.Time, dailyRate string) (i
 		return 0, "", ErrInvalidReservation
 	}
 	nights := int(checkOut.Sub(checkIn).Hours() / 24)
+	total, err := calculateStayAmount(nights, dailyRate)
+	return nights, total, err
+}
+
+func calculateActualStayTotal(checkIn, checkOut, dailyRate string) (int, string, error) {
+	start, err := time.Parse("2006-01-02", checkIn)
+	if err != nil {
+		return 0, "", ErrInvalidReservation
+	}
+	end, err := time.Parse("2006-01-02", checkOut)
+	if err != nil || end.Before(start) {
+		return 0, "", ErrInvalidReservation
+	}
+	nights := int(end.Sub(start).Hours() / 24)
+	total, err := calculateStayAmount(nights, dailyRate)
+	return nights, total, err
+}
+
+func calculateStayAmount(nights int, dailyRate string) (string, error) {
+	if nights < 0 || !moneyPattern.MatchString(dailyRate) {
+		return "", ErrInvalidReservation
+	}
 	parts := strings.SplitN(dailyRate, ".", 2)
 	whole, err := strconv.ParseInt(parts[0], 10, 64)
 	if err != nil {
-		return 0, "", fmt.Errorf("diária inválida: %w", err)
+		return "", fmt.Errorf("diária inválida: %w", err)
 	}
 	fraction := "00"
 	if len(parts) == 2 {
@@ -284,12 +316,12 @@ func calculateReservationTotal(checkIn, checkOut time.Time, dailyRate string) (i
 	}
 	cents, err := strconv.ParseInt(fraction, 10, 64)
 	if err != nil {
-		return 0, "", fmt.Errorf("centavos inválidos: %w", err)
+		return "", fmt.Errorf("centavos inválidos: %w", err)
 	}
 	dailyCents := whole*100 + cents
 	totalCents := dailyCents * int64(nights)
 	if totalCents > 999_999_999_999 {
-		return 0, "", ErrInvalidReservation
+		return "", ErrInvalidReservation
 	}
-	return nights, fmt.Sprintf("%d.%02d", totalCents/100, totalCents%100), nil
+	return fmt.Sprintf("%d.%02d", totalCents/100, totalCents%100), nil
 }

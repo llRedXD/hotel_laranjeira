@@ -38,7 +38,7 @@ export function DashboardPage() {
         ])
         if (active) {
           setSummary(dailySummary)
-          setReservations(reservationPage.reservations.filter(reservation => reservation.status === 'in_progress' || reservation.status === 'confirmed').slice(0, 5))
+          setReservations(reservationPage.reservations.filter(reservation => reservation.status === 'in_progress' || reservation.status === 'confirmed' || reservation.status === 'in_house').slice(0, 5))
         }
       } catch (cause) {
         if (active) setError(cause instanceof Error ? cause.message : 'Não foi possível carregar o painel.')
