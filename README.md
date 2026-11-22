@@ -71,7 +71,8 @@ Para acessar o sistema na avaliação, consulte os
 - Reservas públicas e da recepção, com cálculo de diárias, total previsto e proteção contra conflitos.
 - Consulta de reservas com status previstos, filtro por noites ocupadas e histórico individual pelo cadastro do hóspede.
 - Alteração e cancelamento de reservas futuras, com revisão de valores e auditoria de responsável, horário e estado anterior/posterior.
-- Pagamentos e registro do check-in/check-out realizado continuam fora desta entrega.
+- Ciclo operacional completo: check-in/out realizados, quarto ocupado/liberado, preço final pelas diárias efetivas e auditoria.
+- Pagamentos, consumo, descontos e reembolsos permanecem fora desta entrega.
 
 ## API sem Docker
 
@@ -108,5 +109,5 @@ serviço de e-mail e publicação dos arquivos compilados do front-end.
 
 ## Próximos passos
 
-1. Registrar o aceite final da gestão de reservas; a verificação técnica está documentada em [Validação final](docs/VALIDACAO_FINAL_RESERVAS.md).
-2. Avaliar pagamentos e registro do check-in/check-out realizado em entregas separadas.
+1. Registrar o aceite final da gestão e do ciclo operacional de reservas; roteiros em [validação final](docs/VALIDACAO_FINAL_RESERVAS.md) e [check-in/check-out](docs/VALIDACAO_CICLO_RESERVA.md).
+2. Avaliar pagamentos e serviços adicionais em entregas separadas.

@@ -3,6 +3,7 @@
 BEGIN;
 
 DELETE FROM reservation_events;
+UPDATE rooms SET occupied_by_reservation_id = NULL;
 DELETE FROM reservations;
 DELETE FROM guests;
 DELETE FROM rooms;

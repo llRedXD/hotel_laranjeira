@@ -41,5 +41,9 @@ func staffReservationResponse(r hotel.Reservation) reservationDateResponse {
 		Occupants: r.Occupants, DailyRate: r.DailyRate, TotalAmount: r.TotalAmount, GuestName: r.GuestName,
 		DocumentType: r.DocumentType, Document: r.Document, ContactEmail: r.ContactEmail, RoomNumber: r.RoomNumber, CategoryName: r.CategoryName,
 		Status: r.Status, Version: r.Version, CanEdit: &r.CanEdit, CanCancel: &r.CanCancel,
+		CanCheckIn: &r.CanCheckIn, CanCheckOut: &r.CanCheckOut,
+		CheckedInAt: r.CheckedInAt, CheckedInBy: r.CheckedInBy, CheckedOutAt: r.CheckedOutAt,
+		CheckedInByName: r.CheckedInByName, CheckedOutBy: r.CheckedOutBy, CheckedOutByName: r.CheckedOutByName,
+		ActualNights: r.ActualNights, FinalAmount: r.FinalAmount,
 	}
 }

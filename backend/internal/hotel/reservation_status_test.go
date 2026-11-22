@@ -63,3 +63,22 @@ func TestReservationOperationPermissions(t *testing.T) {
 		}
 	}
 }
+
+func TestActualStayStatusOverridesProjectedDates(t *testing.T) {
+	date := time.Date(2026, 11, 11, 0, 0, 0, 0, time.UTC)
+	checkedIn, checkedOut := date.Add(-time.Hour), date.Add(time.Hour)
+	r := Reservation{CheckIn: date.AddDate(0, 0, -2), CheckOut: date.AddDate(0, 0, 2), CheckedInAt: &checkedIn}
+	r.setOperationalState(date)
+	if r.Status != ReservationInHouse || r.CanCancel || r.CanEdit {
+		t.Fatalf("checked-in reservation state: %+v", r)
+	}
+	r.CheckedOutAt = &checkedOut
+	r.setOperationalState(date)
+	if r.Status != ReservationCompleted || r.CanCancel || r.CanEdit {
+		t.Fatalf("checked-out reservation state: %+v", r)
+	}
+	r.CancelledAt = &date
+	if r.StatusOn(date) != ReservationCancelled {
+		t.Fatalf("cancellation must retain priority: %s", r.StatusOn(date))
+	}
+}

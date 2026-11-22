@@ -87,9 +87,12 @@ validação formal de RG/CPF.
 | POST `/api/v1/public/reservations` | público | `roomId`, datas, `occupants`, `expectedDailyRate`, `guest` (`name`, `documentType`, `document`, `email`) | 201, confirmação sem documento nem e-mail |
 | GET `/api/v1/reservations/availability` | Bearer JWT | mesmos filtros públicos e `reservationId` opcional para edição | `rooms` com disponibilidade e preço estimado, desconsiderando a própria reserva na edição |
 | GET `/api/v1/reservations` | Bearer JWT | `guestId`, `search`, `from`, `to`, `limit`, `offset` opcionais | `reservations` paginadas e `total`; busca por hóspede, documento ou quarto; histórico exato por `guestId`; `from`/`to` filtram noites ocupadas |
-| GET `/api/v1/reservations/summary` | Bearer JWT | `date` (`YYYY-MM-DD`) opcional | `summary` com `date`, hóspedes previstos, entradas previstas e quartos livres na data |
+| GET `/api/v1/reservations/summary` | Bearer JWT | `date` (`YYYY-MM-DD`) opcional | `summary` com `date`, hóspedes na data, entradas previstas/realizadas e quartos livres |
 | POST `/api/v1/reservations` | Bearer JWT | `roomId`, datas, `occupants`, `expectedDailyRate`, `guestId` | 201, reserva operacional |
 | POST `/api/v1/reservations/{id}/cancel` | Bearer JWT | `version` positiva | 200, `reservation` cancelada, versão incrementada e permissões atualizadas |
+| POST `/api/v1/reservations/{id}/check-in` | Bearer JWT | `version` positiva | 200, reserva em hospedagem e quarto ocupado |
+| GET `/api/v1/reservations/{id}/check-out-quote` | Bearer JWT | `version` positiva | 200, timestamp, noites, diária e valor final previsto |
+| POST `/api/v1/reservations/{id}/check-out` | Bearer JWT | `version` positiva | 200, reserva finalizada, noites/valor final e quarto liberado |
 | GET `/api/v1/reservations/{id}` | Bearer JWT | UUID | `reservation` operacional e `hotelDate` em `YYYY-MM-DD` |
 | PATCH `/api/v1/reservations/{id}` | Bearer JWT | `roomId`, `checkIn`, `checkOut`, `occupants`, `expectedDailyRate`, `version` | 200, `reservation` atualizada |
 | GET `/api/v1/reservation-events` | Bearer JWT | `reservationId`, `search`, `limit`, `offset` opcionais | `events` paginados, mais recentes primeiro, e `total` |
@@ -97,15 +100,20 @@ validação formal de RG/CPF.
 A listagem inclui `status`, calculado no backend pela data de
 `America/Sao_Paulo`: `confirmed` (Confirmada), `in_progress` (Estadia prevista
 em andamento), `departure_today` (Saída prevista hoje), `ended` (Encerrada pelo
-período) ou `cancelled` (Cancelada). Cancelamento tem prioridade sobre as datas.
-Esses estados não comprovam check-in ou checkout realizados. Canceladas continuam
-na listagem, mas não bloqueiam quartos nem entram nos indicadores.
+período), `in_house` (Em hospedagem), `completed` (Finalizada) ou `cancelled`
+(Cancelada). Os estados operacionais prevalecem sobre o status previsto;
+cancelamento tem prioridade. Canceladas continuam na listagem, mas não bloqueiam
+quartos nem entram nos indicadores.
 No resumo, `date` pode ser omitido para consultar a data atual do hotel;
 quando informado, continua representando a data de referência do relatório.
 
-Cada item da listagem inclui `guestId`, `version`, `canEdit` e `canCancel`.
-As permissões são verdadeiras somente para reservas não canceladas com entrada
-posterior à data atual do hotel.
+Cada item da listagem inclui `guestId`, `version`, `canEdit`, `canCancel`,
+`canCheckIn` e `canCheckOut`. Também pode incluir timestamps, responsáveis,
+noites realizadas e `finalAmount` após checkout.
+`canEdit` e `canCancel` são verdadeiros somente para reservas não canceladas,
+sem check-in realizado e com entrada prevista posterior à data atual do hotel.
+`canCheckIn` exige reserva não cancelada sem check-in, antes do checkout previsto;
+`canCheckOut` exige hospedagem em curso.
 `guestId` deve ser um UUID válido; combinado com os
 demais filtros, limita os resultados ao hóspede indicado, mesmo após renomeação.
 Sem correspondências, retorna lista vazia e `total=0`.
@@ -127,7 +135,9 @@ o cancelamento é bloqueado. Inexistente retorna 404; versão/estado incompatív
 
 A migração 007 registra uma base inicial das reservas existentes (`imported`),
 sem inventar eventos passados. Um trigger grava criação, cancelamento e alteração
-na mesma transação da reserva. Falha no evento desfaz a operação. Não existem
+na mesma transação da reserva. A migração 008 inclui eventos `checked_in` e
+`checked_out`; falha no evento desfaz a operação e qualquer mudança de ocupação
+do quarto. Não existem
 endpoints para editar ou excluir eventos. A rotina de demonstração apaga
 explicitamente esses eventos antes de recriar as reservas.
 
@@ -145,6 +155,33 @@ busca, paginação e comparação antes/depois. Horários são exibidos em São 
 Mudanças automáticas de status pela passagem das datas não geram eventos.
 A edição preenche o contexto transacional `hotel.actor_id` e
 `hotel.event_source='staff'` para preservar a autoria.
+
+### Check-in, hospedagem e checkout
+
+Administrador e recepção podem usar `POST /api/v1/reservations/{id}/check-in`
+com `version` positiva. Check-in pode ser antecipado ou atrasado, desde que a
+reserva não esteja cancelada e ainda não tenha passado o checkout previsto; o
+servidor revalida a ocupação efetiva do quarto. Sucesso registra timestamp e
+funcionário, muda o status para `in_house` e marca o quarto como ocupado.
+
+Antes do checkout, `GET /api/v1/reservations/{id}/check-out-quote?version=n`
+retorna timestamp da prévia, noites, diária contratada e valor final previsto.
+`POST /api/v1/reservations/{id}/check-out` com a mesma versão recalcula dentro
+da transação, grava `checkedOutAt`, responsável, `actualNights` e `finalAmount`,
+muda o status para `completed` e libera o quarto. O valor usa a diária salva na
+reserva, multiplicada pelas noites civis entre check-in e checkout efetivos em
+`America/Sao_Paulo`; uma saída no mesmo dia resulta em zero noites e R$ 0,00.
+O servidor é a autoridade final e pode recalcular a prévia ao confirmar.
+
+Os dois POSTs são versionados, autenticados e auditados. Transição repetida,
+versão obsoleta ou quarto ocupado retorna 409; datas inválidas retornam 422.
+Não é possível cancelar uma reserva após check-in. A flag `rooms.is_available`
+continua significando habilitação para venda; `isOccupied` e
+`occupiedByReservationId` representam a ocupação operacional separadamente;
+`GET /api/v1/rooms` e `GET /api/v1/rooms/{id}` incluem `isOccupied`.
+Disponibilidade, criação e indicadores usam as datas efetivas quando existem,
+permitindo futuras reservas após a saída prevista sem oferecer noites já
+ocupadas por uma chegada antecipada.
 
 ### Alteração de reservas
 
@@ -210,10 +247,11 @@ Com PostgreSQL local ativo e credenciais de desenvolvimento:
 TEST_DATABASE_URL='postgres://hotel_laranjeira:hotel_laranjeira_dev@localhost:5432/hotel_laranjeira?sslmode=disable' CGO_ENABLED=0 go test ./internal/hotel -v -count=1
 ```
 
-Os testes de reservas usam esquema exclusivo, aplicam as migrações 001, 003, 005, 006 e 007 e
+Os testes de reservas usam esquema exclusivo e aplicam as migrações até a 008;
 fazem rollback/limpeza ao terminar. O usuário precisa de permissão CREATE SCHEMA.
 Eles cobrem preservação de documentos legados, cálculo, conflito de período,
-checkout sucessivo e duas confirmações simultâneas. A migração versionada
+check-in antecipado, valor final, quarto ocupado/liberado, conflito com estadia
+real e reservas futuras sem sobreposição, além de confirmações simultâneas. A migração versionada
 completa inclui também a versão 004 de autenticação.
 Também cobrem evolução de uma reserva existente para a migração 006,
 preservação de snapshots, metadados de cancelamento, liberação/reutilização

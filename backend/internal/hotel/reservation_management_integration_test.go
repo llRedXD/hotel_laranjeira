@@ -66,6 +66,7 @@ func TestReservationManagementMigrationAndCancellation(t *testing.T) {
 	}
 	apply("006_reservation_management.sql")
 	apply("007_reservation_audit.sql")
+	apply("008_reservation_stay.sql")
 	service := NewService(NewPostgresRepository(tx))
 	baseline, totalEvents, eventErr := service.ListReservationEvents(ctx, ReservationEventQuery{ReservationID: reservationID, Limit: 20})
 	if eventErr != nil || totalEvents != 1 || len(baseline) != 1 || baseline[0].Action != "imported" || baseline[0].ActorID != nil || baseline[0].Before != nil || baseline[0].After.Version != 1 {

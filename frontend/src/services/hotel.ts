@@ -17,8 +17,10 @@ export type Entity = {
   capacity?: number
   dailyRate?: string
   isAvailable?: boolean
+  isOccupied?: boolean
+  occupiedByReservationId?: string
 }
-export type ReservationStatus = 'confirmed' | 'in_progress' | 'departure_today' | 'ended' | 'cancelled'
+export type ReservationStatus = 'confirmed' | 'in_progress' | 'departure_today' | 'ended' | 'in_house' | 'completed' | 'cancelled'
 export type ReceptionReservation = {
   roomId: string
   guestId: string
@@ -26,6 +28,8 @@ export type ReceptionReservation = {
   version: number
   canEdit: boolean
   canCancel: boolean
+  canCheckIn: boolean
+  canCheckOut: boolean
   id: string
   checkIn: string
   checkOut: string
@@ -35,14 +39,30 @@ export type ReceptionReservation = {
   guestName: string
   roomNumber: string
   categoryName: string
+  checkedInAt?: string
+  checkedInBy?: string
+  checkedInByName?: string
+  checkedOutAt?: string
+  checkedOutBy?: string
+  checkedOutByName?: string
+  actualNights?: number
+  finalAmount?: string
+}
+export type ReservationCheckoutQuote = {
+  checkoutAt: string
+  actualNights: number
+  dailyRate: string
+  finalAmount: string
+  version: number
 }
 export type ReservationSummary = { date: string, guestsInHouse: number, checkInsToday: number, availableRooms: number }
 export type ReservationAuditState = {
   status: ReservationStatus, roomId: string, roomNumber: string, checkIn: string, checkOut: string,
   occupants: number, dailyRate: string, totalAmount: string, version: number,
+  checkedInAt?: string | null, checkedOutAt?: string | null, actualNights?: number | null, finalAmount?: string | null,
 }
 export type ReservationEvent = {
-  id: string, reservationId: string, action: 'imported' | 'created' | 'cancelled' | 'updated',
+  id: string, reservationId: string, action: 'imported' | 'created' | 'cancelled' | 'updated' | 'checked_in' | 'checked_out',
   source: 'import' | 'public' | 'staff' | 'database', actorId: string | null, actorName: string | null,
   guestName: string, roomNumber: string, occurredAt: string,
   beforeState: ReservationAuditState | null, afterState: ReservationAuditState,
@@ -97,6 +117,20 @@ export async function cancelReservation(id: string, version: number) {
   return authenticatedRequest<{ reservation: ReceptionReservation }>(`/reservations/${encodeURIComponent(id)}/cancel`, {
     method: 'POST', body: JSON.stringify({ version }),
   })
+}
+export async function checkInReservation(id: string, version: number) {
+  return authenticatedRequest<{ reservation: ReceptionReservation }>(`/reservations/${encodeURIComponent(id)}/check-in`, {
+    method: 'POST', body: JSON.stringify({ version }),
+  })
+}
+export async function checkOutReservation(id: string, version: number) {
+  return authenticatedRequest<{ reservation: ReceptionReservation }>(`/reservations/${encodeURIComponent(id)}/check-out`, {
+    method: 'POST', body: JSON.stringify({ version }),
+  })
+}
+export async function quoteCheckOutReservation(id: string, version: number) {
+  const query = new URLSearchParams({ version: String(version) })
+  return authenticatedRequest<{ quote: ReservationCheckoutQuote }>(`/reservations/${encodeURIComponent(id)}/check-out-quote?${query}`)
 }
 export async function getReservation(id: string) {
   return authenticatedRequest<{ reservation: ReceptionReservation, hotelDate: string }>(`/reservations/${encodeURIComponent(id)}`)

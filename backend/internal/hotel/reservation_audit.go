@@ -8,15 +8,19 @@ import (
 )
 
 type ReservationAuditState struct {
-	Status      string `json:"status"`
-	RoomID      string `json:"roomId"`
-	RoomNumber  string `json:"roomNumber"`
-	CheckIn     string `json:"checkIn"`
-	CheckOut    string `json:"checkOut"`
-	Occupants   int    `json:"occupants"`
-	DailyRate   string `json:"dailyRate"`
-	TotalAmount string `json:"totalAmount"`
-	Version     int    `json:"version"`
+	Status       string     `json:"status"`
+	CheckedInAt  *time.Time `json:"checkedInAt,omitempty"`
+	CheckedOutAt *time.Time `json:"checkedOutAt,omitempty"`
+	ActualNights *int       `json:"actualNights,omitempty"`
+	FinalAmount  *string    `json:"finalAmount,omitempty"`
+	RoomID       string     `json:"roomId"`
+	RoomNumber   string     `json:"roomNumber"`
+	CheckIn      string     `json:"checkIn"`
+	CheckOut     string     `json:"checkOut"`
+	Occupants    int        `json:"occupants"`
+	DailyRate    string     `json:"dailyRate"`
+	TotalAmount  string     `json:"totalAmount"`
+	Version      int        `json:"version"`
 }
 
 type ReservationEvent struct {

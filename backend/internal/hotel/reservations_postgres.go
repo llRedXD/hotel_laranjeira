@@ -26,8 +26,8 @@ func (s *PostgresRepository) ListAvailability(ctx context.Context, query Availab
 			SELECT 1 FROM reservations current
 			WHERE current.cancelled_at IS NULL AND current.room_id = r.id
 			  AND ($4::uuid IS NULL OR current.id <> $4::uuid)
-			  AND current.check_in < $3
-			  AND current.check_out > $2
+			  AND COALESCE((current.checked_in_at AT TIME ZONE 'America/Sao_Paulo')::date, current.check_in) < $3
+			  AND COALESCE((current.checked_out_at AT TIME ZONE 'America/Sao_Paulo')::date, current.check_out) > $2
 		  )
 		ORDER BY r.number, r.id`, query.Occupants, query.CheckIn, query.CheckOut, excluded)
 	if err != nil {
@@ -72,10 +72,14 @@ func (s *PostgresRepository) ListReservations(ctx context.Context, query Reserva
 	}
 	rows, err := s.db.Query(ctx, `SELECT r.id, r.guest_id, r.room_id, r.check_in, r.check_out, r.occupants,
 		r.daily_rate::text, r.total_amount::text, r.guest_name_snapshot, r.document_type_snapshot,
-		r.document_snapshot, r.contact_email_snapshot, r.created_at, rm.number, c.name, r.cancelled_at, r.cancelled_by, r.version
+		r.document_snapshot, r.contact_email_snapshot, r.created_at, rm.number, c.name, r.cancelled_at, r.cancelled_by, r.version,
+		r.checked_in_at, r.checked_in_by, r.checked_out_at, r.checked_out_by, r.actual_nights, r.final_amount::text,
+		(SELECT name FROM users WHERE id=r.checked_in_by), (SELECT name FROM users WHERE id=r.checked_out_by)
 		FROM reservations r JOIN rooms rm ON rm.id = r.room_id JOIN room_categories c ON c.id = rm.category_id
 		WHERE `+where+` ORDER BY CASE
 			WHEN r.cancelled_at IS NOT NULL THEN 3
+			WHEN r.checked_in_at IS NOT NULL AND r.checked_out_at IS NULL THEN -1
+			WHEN r.checked_out_at IS NOT NULL THEN 2
 			WHEN r.check_in <= $7::date AND r.check_out > $7::date THEN 0
 			WHEN r.check_in > $7::date THEN 1 ELSE 2 END,
 		r.check_in ASC, r.created_at DESC, r.id LIMIT $5 OFFSET $6`,
@@ -91,7 +95,9 @@ func (s *PostgresRepository) ListReservations(ctx context.Context, query Reserva
 			&reservation.CheckIn, &reservation.CheckOut, &reservation.Occupants, &reservation.DailyRate,
 			&reservation.TotalAmount, &reservation.GuestName, &reservation.DocumentType, &reservation.Document,
 			&reservation.ContactEmail, &reservation.CreatedAt, &reservation.RoomNumber, &reservation.CategoryName,
-			&reservation.CancelledAt, &reservation.CancelledBy, &reservation.Version); err != nil {
+			&reservation.CancelledAt, &reservation.CancelledBy, &reservation.Version,
+			&reservation.CheckedInAt, &reservation.CheckedInBy, &reservation.CheckedOutAt, &reservation.CheckedOutBy,
+			&reservation.ActualNights, &reservation.FinalAmount, &reservation.CheckedInByName, &reservation.CheckedOutByName); err != nil {
 			return nil, 0, err
 		}
 		reservations = append(reservations, reservation)
@@ -102,10 +108,15 @@ func (s *PostgresRepository) ListReservations(ctx context.Context, query Reserva
 func (s *PostgresRepository) ReservationSummary(ctx context.Context, date time.Time) (ReservationSummary, error) {
 	var summary ReservationSummary
 	err := s.db.QueryRow(ctx, `SELECT
-		COALESCE((SELECT sum(occupants) FROM reservations WHERE cancelled_at IS NULL AND check_in <= $1 AND check_out > $1), 0)::int,
-		(SELECT count(*) FROM reservations WHERE cancelled_at IS NULL AND check_in = $1),
+		COALESCE((SELECT sum(occupants) FROM reservations WHERE cancelled_at IS NULL
+			AND COALESCE((checked_in_at AT TIME ZONE 'America/Sao_Paulo')::date, check_in) <= $1
+			AND COALESCE((checked_out_at AT TIME ZONE 'America/Sao_Paulo')::date, check_out) > $1), 0)::int,
+		(SELECT count(*) FROM reservations WHERE cancelled_at IS NULL AND
+			CASE WHEN checked_in_at IS NOT NULL THEN (checked_in_at AT TIME ZONE 'America/Sao_Paulo')::date = $1 ELSE check_in = $1 END),
 		(SELECT count(*) FROM rooms rm WHERE rm.is_available = TRUE AND NOT EXISTS (
-			SELECT 1 FROM reservations r WHERE r.cancelled_at IS NULL AND r.room_id = rm.id AND r.check_in <= $1 AND r.check_out > $1
+			SELECT 1 FROM reservations r WHERE r.cancelled_at IS NULL AND r.room_id = rm.id
+			AND COALESCE((r.checked_in_at AT TIME ZONE 'America/Sao_Paulo')::date, r.check_in) <= $1
+			AND COALESCE((r.checked_out_at AT TIME ZONE 'America/Sao_Paulo')::date, r.check_out) > $1
 		))`, date).Scan(&summary.GuestsInHouse, &summary.CheckInsToday, &summary.AvailableRooms)
 	return summary, err
 }
@@ -145,7 +156,9 @@ func (s *PostgresRepository) CreateReservation(ctx context.Context, input Reserv
 	}
 	var conflicting bool
 	if err = tx.QueryRow(ctx, `SELECT EXISTS (
-		SELECT 1 FROM reservations WHERE cancelled_at IS NULL AND room_id = $1 AND check_in < $3 AND check_out > $2
+		SELECT 1 FROM reservations WHERE cancelled_at IS NULL AND room_id = $1
+		AND COALESCE((checked_in_at AT TIME ZONE 'America/Sao_Paulo')::date, check_in) < $3
+		AND COALESCE((checked_out_at AT TIME ZONE 'America/Sao_Paulo')::date, check_out) > $2
 	)`, input.RoomID, input.CheckIn, input.CheckOut).Scan(&conflicting); err != nil {
 		return Reservation{}, err
 	}

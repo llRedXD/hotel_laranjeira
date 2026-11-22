@@ -10,6 +10,8 @@ const (
 	ReservationInProgress     = "in_progress"
 	ReservationDepartureToday = "departure_today"
 	ReservationEnded          = "ended"
+	ReservationInHouse        = "in_house"
+	ReservationCompleted      = "completed"
 	ReservationCancelled      = "cancelled"
 )
 
@@ -32,6 +34,12 @@ func (r Reservation) StatusOn(date time.Time) string {
 	if r.CancelledAt != nil {
 		return ReservationCancelled
 	}
+	if r.CheckedOutAt != nil {
+		return ReservationCompleted
+	}
+	if r.CheckedInAt != nil {
+		return ReservationInHouse
+	}
 	if r.CheckOut.Before(date) {
 		return ReservationEnded
 	}
@@ -46,6 +54,8 @@ func (r Reservation) StatusOn(date time.Time) string {
 
 func (r *Reservation) setOperationalState(date time.Time) {
 	r.Status = r.StatusOn(date)
-	r.CanEdit = r.CancelledAt == nil && r.CheckIn.After(date)
+	r.CanEdit = r.CancelledAt == nil && r.CheckedInAt == nil && r.CheckIn.After(date)
 	r.CanCancel = r.CanEdit
+	r.CanCheckIn = r.CancelledAt == nil && r.CheckedInAt == nil && r.CheckedOutAt == nil && date.Before(r.CheckOut)
+	r.CanCheckOut = r.CancelledAt == nil && r.CheckedInAt != nil && r.CheckedOutAt == nil
 }

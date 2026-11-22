@@ -5,7 +5,7 @@ import { APIError } from '../services/api'
 import { listReservationEvents, pageSize, type ReservationAuditState, type ReservationEvent } from '../services/hotel'
 import { formatBRL, formatReservationDate } from '../services/reservations'
 
-const actions = { imported: 'Registro inicial', created: 'Criação', cancelled: 'Cancelamento', updated: 'Alteração' }
+const actions = { imported: 'Registro inicial', created: 'Criação', cancelled: 'Cancelamento', updated: 'Alteração', checked_in: 'Check-in realizado', checked_out: 'Check-out realizado' }
 const sources = { import: 'Migração da base', public: 'Site público', staff: 'Equipe do hotel', database: 'Banco de dados' }
 const timestamp = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Sao_Paulo' })
 const button = 'rounded-lg px-3 py-2 text-sm font-semibold text-forest hover:bg-forest/10 focus-visible:outline-orange disabled:opacity-45'
@@ -18,6 +18,9 @@ function StateDetails({ state }: { state: ReservationAuditState | null }) {
     <div><dt className="text-ink/60">Período previsto</dt><dd>{formatReservationDate(state.checkIn)} → {formatReservationDate(state.checkOut)}</dd></div>
     <div><dt className="text-ink/60">Ocupantes</dt><dd>{state.occupants}</dd></div>
     <div><dt className="text-ink/60">Diária · total</dt><dd>{formatBRL(state.dailyRate)} · {formatBRL(state.totalAmount)}</dd></div>
+    {state.checkedInAt && <div><dt className="text-ink/60">Check-in realizado</dt><dd>{timestamp.format(new Date(state.checkedInAt))}</dd></div>}
+    {state.checkedOutAt && <div><dt className="text-ink/60">Check-out realizado</dt><dd>{timestamp.format(new Date(state.checkedOutAt))}</dd></div>}
+    {state.finalAmount && <div><dt className="text-ink/60">Valor final</dt><dd>{formatBRL(state.finalAmount)} · {state.actualNights ?? 0} diárias</dd></div>}
   </dl>
 }
 

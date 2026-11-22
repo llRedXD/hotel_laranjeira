@@ -26,24 +26,34 @@ type reservationRequest struct {
 }
 
 type reservationDateResponse struct {
-	Version      int    `json:"version,omitempty"`
-	CanEdit      *bool  `json:"canEdit,omitempty"`
-	CanCancel    *bool  `json:"canCancel,omitempty"`
-	Status       string `json:"status,omitempty"`
-	ID           string `json:"id"`
-	GuestID      string `json:"guestId,omitempty"`
-	RoomID       string `json:"roomId"`
-	CheckIn      string `json:"checkIn"`
-	CheckOut     string `json:"checkOut"`
-	Occupants    int    `json:"occupants"`
-	DailyRate    string `json:"dailyRate"`
-	TotalAmount  string `json:"totalAmount"`
-	GuestName    string `json:"guestName,omitempty"`
-	DocumentType string `json:"documentType,omitempty"`
-	Document     string `json:"document,omitempty"`
-	ContactEmail string `json:"contactEmail,omitempty"`
-	RoomNumber   string `json:"roomNumber,omitempty"`
-	CategoryName string `json:"categoryName,omitempty"`
+	Version          int        `json:"version,omitempty"`
+	CanEdit          *bool      `json:"canEdit,omitempty"`
+	CanCancel        *bool      `json:"canCancel,omitempty"`
+	CanCheckIn       *bool      `json:"canCheckIn,omitempty"`
+	CanCheckOut      *bool      `json:"canCheckOut,omitempty"`
+	Status           string     `json:"status,omitempty"`
+	CheckedInAt      *time.Time `json:"checkedInAt,omitempty"`
+	CheckedInBy      *string    `json:"checkedInBy,omitempty"`
+	CheckedInByName  *string    `json:"checkedInByName,omitempty"`
+	CheckedOutAt     *time.Time `json:"checkedOutAt,omitempty"`
+	CheckedOutBy     *string    `json:"checkedOutBy,omitempty"`
+	CheckedOutByName *string    `json:"checkedOutByName,omitempty"`
+	ActualNights     *int       `json:"actualNights,omitempty"`
+	FinalAmount      *string    `json:"finalAmount,omitempty"`
+	ID               string     `json:"id"`
+	GuestID          string     `json:"guestId,omitempty"`
+	RoomID           string     `json:"roomId"`
+	CheckIn          string     `json:"checkIn"`
+	CheckOut         string     `json:"checkOut"`
+	Occupants        int        `json:"occupants"`
+	DailyRate        string     `json:"dailyRate"`
+	TotalAmount      string     `json:"totalAmount"`
+	GuestName        string     `json:"guestName,omitempty"`
+	DocumentType     string     `json:"documentType,omitempty"`
+	Document         string     `json:"document,omitempty"`
+	ContactEmail     string     `json:"contactEmail,omitempty"`
+	RoomNumber       string     `json:"roomNumber,omitempty"`
+	CategoryName     string     `json:"categoryName,omitempty"`
 }
 
 func (a *api) publicAvailability(w http.ResponseWriter, r *http.Request) {
@@ -226,7 +236,7 @@ func writeReservationError(w http.ResponseWriter, err error) bool {
 		return true
 	}
 	if errors.Is(err, hotel.ErrNotFound) {
-		writeError(w, http.StatusNotFound, "not_found", "Quarto ou hóspede não encontrado.", nil)
+		writeError(w, http.StatusNotFound, "not_found", "Reserva, quarto ou hóspede não encontrado.", nil)
 		return true
 	}
 	internalError(w, err)

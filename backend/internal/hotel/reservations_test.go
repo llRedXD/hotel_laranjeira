@@ -33,6 +33,30 @@ func TestReservationNightsAndTotal(t *testing.T) {
 	}
 }
 
+func TestActualStayTotalUsesCivilNightsAndContractedRate(t *testing.T) {
+	for _, test := range []struct {
+		name, checkIn, checkOut, rate, total string
+		nights                               int
+	}{
+		{"same day", "2026-11-10", "2026-11-10", "125.50", "0.00", 0},
+		{"two nights", "2026-11-10", "2026-11-12", "125.50", "251.00", 2},
+		{"early arrival", "2026-11-09", "2026-11-12", "125.50", "376.50", 3},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			nights, total, err := calculateActualStayTotal(test.checkIn, test.checkOut, test.rate)
+			if err != nil || nights != test.nights || total != test.total {
+				t.Fatalf("nights=%d total=%q err=%v", nights, total, err)
+			}
+		})
+	}
+	if _, _, err := calculateActualStayTotal("2026-11-11", "2026-11-10", "100.00"); !errors.Is(err, ErrInvalidReservation) {
+		t.Fatalf("negative stay accepted: %v", err)
+	}
+	if _, _, err := calculateActualStayTotal("2026-11-10", "2026-11-12", "9999999999.99"); !errors.Is(err, ErrInvalidReservation) {
+		t.Fatalf("overflowing final amount accepted: %v", err)
+	}
+}
+
 func TestValidateStayAndAvailability(t *testing.T) {
 	checkIn := time.Date(2026, 11, 10, 0, 0, 0, 0, time.UTC)
 	checkOut := time.Date(2026, 11, 12, 0, 0, 0, 0, time.UTC)
